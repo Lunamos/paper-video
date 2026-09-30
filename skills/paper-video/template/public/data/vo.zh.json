@@ -1,0 +1,225 @@
+{
+ "version": 2,
+ "meta": {
+  "lang": "zh",
+  "backend": "none",
+  "note": "PLACEHOLDER timings (no audio). Regenerate with the voice-over pipeline.",
+  "estimatedTotalMs": 13620
+ },
+ "scenes": [
+  {
+   "id": "s_example",
+   "audio": "",
+   "durationMs": 13620,
+   "minSeconds": 12,
+   "leadInMs": 500,
+   "tailMs": 900,
+   "chapter": "示例",
+   "lines": [
+    {
+     "id": "a",
+     "text": "单摆摆一次要多久，只取决于一件事：摆长。",
+     "startMs": 0,
+     "endMs": 4210,
+     "words": [
+      {
+       "w": "单摆",
+       "startMs": 0,
+       "endMs": 420,
+       "sp": 0
+      },
+      {
+       "w": "摆一",
+       "startMs": 450,
+       "endMs": 870,
+       "sp": 0
+      },
+      {
+       "w": "次要",
+       "startMs": 900,
+       "endMs": 1320,
+       "sp": 0
+      },
+      {
+       "w": "多久，",
+       "startMs": 1350,
+       "endMs": 1770,
+       "sp": 0
+      },
+      {
+       "w": "只取",
+       "startMs": 2000,
+       "endMs": 2420,
+       "sp": 0
+      },
+      {
+       "w": "决于",
+       "startMs": 2450,
+       "endMs": 2870,
+       "sp": 0
+      },
+      {
+       "w": "一件",
+       "startMs": 2900,
+       "endMs": 3320,
+       "sp": 0
+      },
+      {
+       "w": "事：",
+       "startMs": 3350,
+       "endMs": 3560,
+       "sp": 0
+      },
+      {
+       "w": "摆长。",
+       "startMs": 3790,
+       "endMs": 4210,
+       "sp": 0
+      }
+     ],
+     "anchors": {
+      "pendulum": 0,
+      "length": 3790
+     }
+    },
+    {
+     "id": "b",
+     "text": "周期等于二派乘以根号下 L 除以 g。",
+     "startMs": 4890,
+     "endMs": 8520,
+     "words": [
+      {
+       "w": "周期",
+       "startMs": 4890,
+       "endMs": 5310,
+       "sp": 0
+      },
+      {
+       "w": "等于",
+       "startMs": 5340,
+       "endMs": 5760,
+       "sp": 0
+      },
+      {
+       "w": "二派",
+       "startMs": 5790,
+       "endMs": 6210,
+       "sp": 0
+      },
+      {
+       "w": "乘以",
+       "startMs": 6240,
+       "endMs": 6660,
+       "sp": 0
+      },
+      {
+       "w": "根号",
+       "startMs": 6690,
+       "endMs": 7110,
+       "sp": 0
+      },
+      {
+       "w": "下",
+       "startMs": 7140,
+       "endMs": 7350,
+       "sp": 0
+      },
+      {
+       "w": "L",
+       "startMs": 7380,
+       "endMs": 7590,
+       "sp": 1
+      },
+      {
+       "w": "除以",
+       "startMs": 7620,
+       "endMs": 8040,
+       "sp": 1
+      },
+      {
+       "w": "g",
+       "startMs": 8070,
+       "endMs": 8280,
+       "sp": 1
+      },
+      {
+       "w": "。",
+       "startMs": 8310,
+       "endMs": 8520,
+       "sp": 1
+      }
+     ],
+     "anchors": {
+      "formula": 4890
+     }
+    },
+    {
+     "id": "c",
+     "text": "摆长变成四倍，每次摆动的时间就变成两倍。",
+     "startMs": 9200,
+     "endMs": 13420,
+     "words": [
+      {
+       "w": "摆长",
+       "startMs": 9200,
+       "endMs": 9620,
+       "sp": 0
+      },
+      {
+       "w": "变成",
+       "startMs": 9650,
+       "endMs": 10070,
+       "sp": 0
+      },
+      {
+       "w": "四倍，",
+       "startMs": 10100,
+       "endMs": 10520,
+       "sp": 0
+      },
+      {
+       "w": "每次",
+       "startMs": 10750,
+       "endMs": 11170,
+       "sp": 0
+      },
+      {
+       "w": "摆动",
+       "startMs": 11200,
+       "endMs": 11620,
+       "sp": 0
+      },
+      {
+       "w": "的时",
+       "startMs": 11650,
+       "endMs": 12070,
+       "sp": 0
+      },
+      {
+       "w": "间就",
+       "startMs": 12100,
+       "endMs": 12520,
+       "sp": 0
+      },
+      {
+       "w": "变成",
+       "startMs": 12550,
+       "endMs": 12970,
+       "sp": 0
+      },
+      {
+       "w": "两倍。",
+       "startMs": 13000,
+       "endMs": 13420,
+       "sp": 0
+      }
+     ],
+     "anchors": {
+      "chart": 10100,
+      "twice": 13000
+     }
+    }
+   ]
+  }
+ ]
+}

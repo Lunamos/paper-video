@@ -1,0 +1,833 @@
+#!/usr/bin/env python3
+"""Voice-over builder: scenes.json -> one audio clip per scene + word-timed timeline JSON.
+
+Backends (per cut, scenes.json `voices.<cut>.backend`):
+  elevenlabs  paid, best quality. v3 models + audio tags ([curious], [excited], [chuckles] ...),
+              character alignment from /with-timestamps. Key: ELEVENLABS_API_KEY (env or .env).
+              Several seeds per scene; each take is checked by an ASR round-trip (Scribe) and
+              pitch-variation stats, and the best is picked automatically.
+  edge        free, no key: Microsoft Edge neural voices via the `edge-tts` package (run through
+              uv automatically). Word timings from WordBoundary events. Audio tags are stripped.
+  recorded    your own narration: recordings/<cut>/<scene_id>.(wav|mp3|m4a|flac). Word timings from
+              local faster-whisper, aligned to the script. Interior pauses kept unless --tighten.
+  none        no audio: a silent timeline from reading speed, so captions and anchors still work.
+
+Why one request per scene: generating each line separately makes every sentence start "cold";
+a whole-scene read flows like a person talking.
+
+Pipeline per scene and take:
+  synth (hash-cached by text + voice + model + settings + seed)
+  -> graded pause tightening (clause < line break < sentence < ellipsis), per-line minimum gaps
+     (`pauseAfterMs`), optional tempo
+  -> polish (rumble high-pass, gentle compression, presence) + loudness normalisation
+  -> QA (prosody always; ASR when choosing between takes) -> pick (manual picks file wins;
+     `"pick": "steady"` on a scene prefers an even delivery)
+Outputs public/audio/<cut>/<scene>.mp3, public/data/vo.<cut>.json (version 2, read by
+src/timeline/timeline.ts) and notes/vo_report.<cut>.json.
+
+ElevenLabs: before every paid batch the subscription quota is queried, the billable characters of
+all uncached requests are estimated and printed, and the run aborts if they exceed the remainder.
+Keys are only read from the environment or .env and are never printed or written anywhere.
+
+Usage:
+  python3 scripts/vo.py build --lang en [--scene s_intro,s_method] [--seeds 11,23] [--takes 2] [--dry-run]
+  python3 scripts/vo.py audition --lang en --voices a=VOICE_ID,b=VOICE_ID [--model eleven_v3] [--text "..."]
+  python3 scripts/vo.py audition --lang zh --backend edge --voices yunxi=zh-CN-YunxiNeural,xiaoxiao=zh-CN-XiaoxiaoNeural
+(numpy / edge-tts / faster-whisper are pulled in through `uv run --with ...` when needed.)
+"""
+from __future__ import annotations
+
+import argparse
+import base64
+import datetime as dt
+import difflib
+import hashlib
+import json
+import pathlib
+import re
+import shutil
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from common import (CJK, ROOT, dur_s, env_key, load_script, normalise, reexec_with,  # noqa: E402
+                    run_with, strip_tags)
+
+CACHE = ROOT / "audio_cache"
+API = "https://api.elevenlabs.io"
+COST = {"eleven_v3": 1.0, "eleven_v3_conversational": 0.5, "eleven_multilingual_v2": 1.0, "eleven_flash_v2_5": 0.5,
+        "eleven_turbo_v2_5": 0.5}
+TARGET_LUFS = -19.0  # voice level before the final -14 LUFS master (music sits at -17.4 and is ducked)
+MAX_PAUSE = 0.42  # s, fallback cap for silences inside a scene
+EDGE_KEEP = 0.05  # s of silence kept at the start / end of a scene clip
+DEFAULT_SEEDS = [11, 23, 37]
+OPENERS = set("（(「『“‘《〈[")
+AUDITION_TEXT = {
+    "en": ("[curious] Have you ever wondered why a model gets the easy cases right, and the hard ones wrong? "
+           "[excited] In the next few minutes, we'll see exactly where it breaks... and one small idea that fixes it."),
+    "zh": ("[curious] 你有没有想过，为什么模型简单的题都做对了，难一点就不行？"
+           "[excited] 接下来几分钟，我们来看看它到底卡在哪里……以及一个很小的改动，怎么把它修好。"),
+}
+
+
+# ================================================================ timings
+def char_times(text: str, words) -> list[tuple[int, int]]:
+    """Per-character (startMs, endMs) for `text` from any word list [(word, start_s, end_s)].
+
+    Spoken characters of the script (letters, digits, CJK) are aligned to the characters of the
+    recognised / synthesised words with difflib; mismatched spans share their time proportionally,
+    unmatched characters are interpolated, and spaces / punctuation inherit the previous end time.
+    Used by the edge and recorded backends so the rest of the pipeline sees one format."""
+    spoken = lambda c: c.isalnum() or bool(CJK.match(c))  # noqa: E731
+    tpos = [i for i, c in enumerate(text) if spoken(c)]
+    tch = [text[i].lower() for i in tpos]
+    wch, wt = [], []
+    for w, s, e in words:
+        cs = [c.lower() for c in w if spoken(c)]
+        for k, c in enumerate(cs):
+            wch.append(c)
+            wt.append((s + (e - s) * k / len(cs), s + (e - s) * (k + 1) / len(cs)))
+    got: dict[int, tuple[float, float]] = {}
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=tch, b=wch, autojunk=False).get_opcodes():
+        if op == "equal":
+            for k in range(i2 - i1):
+                got[i1 + k] = wt[j1 + k]
+        elif op == "replace":
+            s0, s1 = wt[j1][0], wt[j2 - 1][1]
+            n = i2 - i1
+            for k in range(n):
+                got[i1 + k] = (s0 + (s1 - s0) * k / n, s0 + (s1 - s0) * (k + 1) / n)
+    # interpolate spoken characters that found no counterpart
+    known = sorted(got)
+    for k in range(len(tpos)):
+        if k in got:
+            continue
+        prev = max((j for j in known if j < k), default=None)
+        nxt = min((j for j in known if j > k), default=None)
+        a = got[prev][1] if prev is not None else (got[nxt][0] if nxt is not None else 0.0)
+        b = got[nxt][0] if nxt is not None else a
+        span = (nxt if nxt is not None else len(tpos)) - (prev if prev is not None else -1)
+        pos = k - (prev if prev is not None else -1)
+        t = a + (b - a) * (pos - 0.5) / span
+        got[k] = (t, t)
+    times, last, k = [], (0, 0), 0
+    for i in range(len(text)):
+        if k < len(tpos) and tpos[k] == i:
+            s, e = got[k]
+            last = (round(s * 1000), round(e * 1000))
+            times.append(last)
+            k += 1
+        else:
+            times.append((last[1], last[1]))
+    return times
+
+
+def reading_times(lines, cfg) -> tuple[list[tuple[int, int]], int]:
+    """`none` backend: synthetic per-character times from reading speed (chars/s) and punctuation.
+    cfg: cps (latin letters/digits per s, default 15), cpsCjk (CJK characters per s, default 5)."""
+    cps, cps_cjk = cfg.get("cps", 15.0), cfg.get("cpsCjk", 5.0)
+    times, t = [], 0.0
+    for n, l in enumerate(lines):
+        for c in l["say"]:
+            if CJK.match(c) or c.isalnum():
+                d = 1000 / (cps_cjk if CJK.match(c) else cps)
+                times.append((round(t), round(t + d)))
+                t += d
+            else:
+                times.append((round(t), round(t)))
+                t += 380 if c in ".!?。！？…" else 200 if c in ",;:，；：、—" else 0
+        if n < len(lines) - 1:
+            times.append((round(t), round(t)))  # the joining space
+            t += max(300, l.get("pauseAfterMs", 0))
+    return times, round(t)
+
+
+# ================================================================ elevenlabs
+def el_req(path, payload=None, timeout=240):
+    r = urllib.request.Request(API + path, data=json.dumps(payload).encode() if payload is not None else None,
+                               headers={"xi-api-key": env_key("ELEVENLABS_API_KEY"), "Content-Type": "application/json"},
+                               method="POST" if payload is not None else "GET")
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as resp:
+            return json.load(resp)
+    except urllib.error.HTTPError as e:
+        raise RuntimeError(f"HTTP {e.code} on {path.split('?')[0]}: {e.read().decode(errors='replace')[:400]}") from None
+
+
+def el_quota():
+    s = el_req("/v1/user/subscription")
+    return s["character_limit"] - s["character_count"], s
+
+
+def el_settings(model, stability):
+    if model.startswith("eleven_v3"):
+        vs = {"stability": stability, "similarity_boost": 0.8}
+        if model == "eleven_v3_conversational":
+            vs["use_speaker_boost"] = True
+        return vs
+    return {"stability": stability, "similarity_boost": 0.8, "style": 0.25, "use_speaker_boost": True}
+
+
+def cache_key(**parts) -> str:
+    return hashlib.sha256(json.dumps(parts, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:24]
+
+
+def el_key(text, voice, model, stability, seed, lang):
+    return cache_key(t=text, v=voice, m=model, s=el_settings(model, stability), seed=seed, l=lang)
+
+
+def el_synth(text, voice, model, stability, seed, lang):
+    """One ElevenLabs request (cached). Returns (key, mp3, per-char times, fresh)."""
+    key = el_key(text, voice, model, stability, seed, lang)
+    d = CACHE / "elevenlabs"
+    mp3, meta = d / f"{key}.mp3", d / f"{key}.json"
+    fresh = not (mp3.exists() and meta.exists())
+    if fresh:
+        payload = {"text": text, "model_id": model, "voice_settings": el_settings(model, stability), "seed": seed}
+        if lang.split("-")[0] != "en":
+            payload["language_code"] = lang.split("-")[0]
+        url = f"/v1/text-to-speech/{voice}/with-timestamps?output_format=mp3_44100_128"
+        try:
+            out = el_req(url, payload)
+        except RuntimeError as e:
+            if "language" not in str(e):
+                raise
+            payload.pop("language_code")
+            out = el_req(url, payload)
+        d.mkdir(parents=True, exist_ok=True)
+        mp3.write_bytes(base64.b64decode(out["audio_base64"]))
+        meta.write_text(json.dumps({"text": text, "voice": voice, "model": model, "seed": seed, "lang": lang,
+                                    "alignment": out.get("alignment") or out.get("normalized_alignment")}, ensure_ascii=False))
+    al = json.loads(meta.read_text())["alignment"]
+    return key, mp3, el_times(text, al), fresh
+
+
+def el_times(text, al):
+    """Character alignment -> per-character ms (maps by difflib if the service normalised the text)."""
+    chars = "".join(al["characters"])
+    if chars == text:
+        idx = list(range(len(text)))
+    else:
+        mp = {}
+        for op, i1, i2, j1, _ in difflib.SequenceMatcher(a=text, b=chars, autojunk=False).get_opcodes():
+            if op == "equal":
+                mp.update({i1 + k: j1 + k for k in range(i2 - i1)})
+        idx = [mp.get(i) for i in range(len(text))]
+    st, en = al["character_start_times_seconds"], al["character_end_times_seconds"]
+    times, last = [], (0, 0)
+    for j in idx:
+        if j is not None:
+            last = (round(st[j] * 1000), round(en[j] * 1000))
+        times.append(last)
+    return times
+
+
+# ================================================================ edge-tts
+def edge_synth(text, cfg, lang):
+    """Free Edge neural voice (cached). Returns (key, mp3, per-char times, fresh)."""
+    voice, rate, pitch = cfg["voice"], cfg.get("rate", "+0%"), cfg.get("pitch", "+0Hz")
+    key = cache_key(t=text, v=voice, r=rate, p=pitch, b="edge")
+    d = CACHE / "edge"
+    mp3, meta = d / f"{key}.mp3", d / f"{key}.json"
+    fresh = not (mp3.exists() and meta.exists())
+    if fresh:
+        d.mkdir(parents=True, exist_ok=True)
+        src = d / f"{key}.txt"
+        src.write_text(text)
+        out = run_with(["edge-tts"], pathlib.Path(__file__).resolve(), ["_edge", str(src), voice, rate, pitch, str(mp3)])
+        src.unlink()
+        if not out["words"]:
+            sys.exit(f"edge-tts returned no word boundaries for voice {voice}")
+        meta.write_text(json.dumps({"text": text, "voice": voice, "words": out["words"]}, ensure_ascii=False))
+    return key, mp3, char_times(text, json.loads(meta.read_text())["words"]), fresh
+
+
+def _edge_worker(argv):
+    """Runs inside the edge-tts environment; writes the mp3 and prints {"words": [[w, s, e], ...]}."""
+    import asyncio
+
+    import edge_tts
+    src, voice, rate, pitch, out = argv
+    text = pathlib.Path(src).read_text()
+
+    async def go():
+        try:  # edge-tts >= 7 emits SentenceBoundary unless asked for words
+            comm = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, boundary="WordBoundary")
+        except TypeError:
+            comm = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+        words = []
+        with open(out, "wb") as f:
+            async for ch in comm.stream():
+                if ch["type"] == "audio":
+                    f.write(ch["data"])
+                elif ch["type"] == "WordBoundary":
+                    words.append([ch["text"], ch["offset"] / 1e7, (ch["offset"] + ch["duration"]) / 1e7])
+        return words
+
+    print(json.dumps({"words": asyncio.run(go())}, ensure_ascii=False))
+
+
+# ================================================================ recorded
+def recorded_take(cut, scene_id, text, lang, cfg):
+    """User narration + faster-whisper word timings (cached by audio bytes + script)."""
+    found = [p for ext in ("wav", "mp3", "m4a", "flac") if (p := ROOT / "recordings" / cut / f"{scene_id}.{ext}").exists()]
+    if not found:
+        sys.exit(f"missing recording: recordings/{cut}/{scene_id}.wav|mp3|m4a|flac")
+    audio = found[0]
+    model = cfg.get("whisperModel", "small")
+    key = cache_key(a=hashlib.sha256(audio.read_bytes()).hexdigest(), t=text, m=model, b="recorded")
+    meta = CACHE / "recorded" / f"{key}.json"
+    fresh = not meta.exists()
+    if fresh:
+        import voice_qa
+        print(f"   transcribing {audio.relative_to(ROOT)} with faster-whisper ({model}) ...")
+        res = voice_qa.whisper(audio, lang, model, prompt=text)
+        meta.parent.mkdir(parents=True, exist_ok=True)
+        meta.write_text(json.dumps(res, ensure_ascii=False))
+    res = json.loads(meta.read_text())
+    return key, audio, char_times(text, res["words"]), fresh, res
+
+
+# ================================================================ tokens
+def tokenize(text, times=None):
+    """Caption tokens: latin words / numbers, single CJK characters. Punctuation sticks to the
+    neighbouring token; [tags] are skipped. Returns dicts with w, sp (preceded by a space),
+    c0/c1 (char span) and, if times are given, startMs/endMs of the token's letters."""
+    toks, cur, pending, space = [], None, "", False
+    i, n = 0, len(text)
+
+    def close():
+        nonlocal cur
+        if cur is not None:
+            toks.append(cur)
+            cur = None
+
+    while i < n:
+        ch = text[i]
+        if ch == "[" and (j := text.find("]", i)) != -1:
+            close()
+            i = j + 1
+            continue
+        is_num_sep = ch in ".,:" and 0 < i < n - 1 and text[i - 1].isdigit() and text[i + 1].isdigit()
+        if ch.isspace():
+            close()
+            space = True
+        elif CJK.match(ch):
+            close()
+            cur = {"w": pending + ch, "sp": space, "c0": i, "c1": i + 1}
+            if times:
+                cur["startMs"], cur["endMs"] = times[i]
+            close()
+            pending, space = "", False
+        elif ch.isalnum() or ch in "'’-%" or is_num_sep:
+            if cur is None:
+                cur = {"w": pending + ch, "sp": space, "c0": i, "c1": i + 1}
+                if times:
+                    cur["startMs"], cur["endMs"] = times[i]
+                pending, space = "", False
+            else:
+                cur["w"] += ch
+                cur["c1"] = i + 1
+                if times:
+                    cur["endMs"] = times[i][1]
+        elif ch in OPENERS:
+            close()
+            pending += ch
+        elif cur is not None:
+            cur["w"] += ch
+        elif toks:
+            toks[-1]["w"] += ch
+        i += 1
+    close()
+    return toks
+
+
+def key_of(w):
+    return re.sub(r"[^\w]", "", w.lower())
+
+
+def align_display(display_toks, tts_toks):
+    """Give caption (text) tokens the timings of the spoken (tts) tokens via sequence alignment."""
+    a = [key_of(t["w"]) for t in display_toks]
+    b = [key_of(t["w"]) for t in tts_toks]
+    out = [dict(t) for t in display_toks]
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(a=a, b=b, autojunk=False).get_opcodes():
+        if op == "equal":
+            for k in range(i2 - i1):
+                out[i1 + k]["startMs"], out[i1 + k]["endMs"] = tts_toks[j1 + k]["startMs"], tts_toks[j1 + k]["endMs"]
+        elif op == "replace":
+            s0, s1 = tts_toks[j1]["startMs"], tts_toks[j2 - 1]["endMs"]
+            lens = [max(1, len(a[i])) for i in range(i1, i2)]
+            tot, acc = sum(lens), 0
+            for k, L in enumerate(lens):
+                out[i1 + k]["startMs"] = round(s0 + (s1 - s0) * acc / tot)
+                acc += L
+                out[i1 + k]["endMs"] = round(s0 + (s1 - s0) * acc / tot)
+        elif op == "delete":
+            t = tts_toks[j1 - 1]["endMs"] if j1 > 0 else (tts_toks[0]["startMs"] if tts_toks else 0)
+            for k in range(i1, i2):
+                out[k]["startMs"] = out[k]["endMs"] = t
+    last = 0
+    for t in out:
+        if "startMs" not in t:
+            t["startMs"] = t["endMs"] = last
+        last = t["endMs"]
+    return out
+
+
+def find_anchor(text, disp, words, target):
+    """Latin target: first token equal to it (else prefix). CJK / other: substring -> covering token."""
+    k = key_of(target)
+    if not CJK.search(target):
+        for d, w in zip(disp, words):
+            if key_of(d["w"]) == k:
+                return w["startMs"]
+        for d, w in zip(disp, words):
+            if key_of(d["w"]).startswith(k):
+                return w["startMs"]
+    pos = text.find(target)
+    if pos < 0:
+        return None
+    return next((w["startMs"] for d, w in zip(disp, words) if d["c1"] > pos), None)
+
+
+def lines_json(scene_id, lines, per_line):
+    """Caption words + anchors per line, in the vo.<cut>.json v2 format."""
+    out = []
+    for l, toks in zip(lines, per_line):
+        disp = tokenize(l["text"])
+        words = align_display(disp, toks) if toks else disp
+        anchors = {}
+        for name, w in (l.get("anchors") or {}).items():
+            hit = find_anchor(l["text"], disp, words, w)
+            if hit is None:
+                print(f"   ! anchor '{name}' -> '{w}' not found in {scene_id}.{l['id']}")
+                continue
+            anchors[name] = hit
+        out.append({"id": l["id"], "text": l["text"],
+                    "startMs": words[0].get("startMs", 0) if words else 0, "endMs": words[-1].get("endMs", 0) if words else 0,
+                    "words": [{"w": w["w"], "startMs": w.get("startMs", 0), "endMs": w.get("endMs", 0), "sp": 1 if w.get("sp") else 0}
+                              for w in words],
+                    "anchors": anchors})
+    return out
+
+
+# ================================================================ audio processing
+def silences(path, noise_db=-40, min_d=0.12):
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-af", f"silencedetect=noise={noise_db}dB:d={min_d}",
+                        "-f", "null", "-"], capture_output=True, text=True)
+    out, cur = [], None
+    for line in r.stderr.splitlines():
+        if m := re.search(r"silence_start: (-?[0-9.]+)", line):
+            cur = max(0.0, float(m.group(1)))
+        if (m := re.search(r"silence_end: ([0-9.]+)", line)) and cur is not None:
+            out.append((cur, float(m.group(1))))
+            cur = None
+    if cur is not None:
+        out.append((cur, dur_s(path)))
+    return out
+
+
+def edit_audio(src, dst, cuts, inserts):
+    """Remove `cuts` [(a, b)] and insert silence `inserts` [(t, secs)] (original-timeline seconds).
+    Writes mono 44.1 kHz WAV and returns remap(sec) from the original to the edited timeline."""
+    dur = dur_s(src)
+    events = sorted([(a, "cut", b) for a, b in cuts] + [(t, "ins", s) for t, s in inserts])
+    segs, t = [], 0.0
+    for at, kind, val in events:
+        if at > t:
+            segs.append(("a", t, at))
+        if kind == "cut":
+            t = max(t, val)
+        else:
+            t = max(t, at)
+            segs.append(("s", val, None))
+    if t < dur:
+        segs.append(("a", t, dur))
+    parts = [f"[0:a]atrim={x:.4f}:{y:.4f},asetpts=PTS-STARTPTS[p{i}]" if k == "a" else
+             f"anullsrc=r=44100:cl=mono,atrim=0:{x:.4f},asetpts=PTS-STARTPTS[p{i}]" for i, (k, x, y) in enumerate(segs)]
+    fc = ";".join(parts) + ";" + "".join(f"[p{i}]" for i in range(len(segs))) + f"concat=n={len(segs)}:v=0:a=1[out]"
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(src), "-filter_complex", fc, "-map", "[out]",
+                    "-ac", "1", "-ar", "44100", "-c:a", "pcm_s16le", str(dst)], check=True)
+
+    def remap(sec):
+        shift = 0.0
+        for at, kind, val in events:
+            if kind == "cut":
+                if sec >= val:
+                    shift -= val - at
+                elif sec > at:
+                    shift -= sec - at
+            elif sec >= at:
+                shift += val
+        return sec + shift
+
+    return remap
+
+
+def polish(src, dst):
+    """Standard VO polish: rumble high-pass + gentle 2.5:1 compression (keeps expressive peaks from
+    jumping out over the music) + a little presence."""
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(src), "-af",
+                    "highpass=f=70,acompressor=threshold=-24dB:ratio=2.5:attack=8:release=120:makeup=1.5,"
+                    "equalizer=f=3500:t=q:w=1.0:g=1.5", "-c:a", "pcm_s16le", str(dst)], check=True)
+
+
+def line_offsets(text, lines):
+    offs, pos = [], 0
+    for l in lines:
+        s = text.find(l["say"], pos)
+        offs.append((s, s + len(l["say"])))
+        pos = s + len(l["say"])
+    return offs
+
+
+def process_take(scene_id, lines, text, times, audio, workdir, cfg, tighten=True):
+    """Tighten + gaps + tempo + polish + normalise one take. Returns (final_mp3, lines_json, durationMs).
+
+    Graded pauses: the longest silence allowed depends on what the script says there
+    (plain word gap 0.2 s < comma 0.28 < sentence 0.45 < sentence + new line 0.5 < ellipsis 0.55),
+    scaled by cfg.pauseScale. Breaths (above -50 dB) survive. `pauseAfterMs` on a line then
+    guarantees a minimum gap after it."""
+    tempo, pause_scale = cfg.get("tempo", 1.0), cfg.get("pauseScale", 1.0)
+    offs = line_offsets(text, lines)
+    all_toks = tokenize(text, times)
+    per_line = [[t for t in all_toks if a <= t["c0"] < b] for a, b in offs]
+    spoken = [i for i, ch in enumerate(text) if ch.isalnum() or CJK.match(ch)]
+    line_starts = {a for a, _ in offs}
+
+    def allowed_pause(a_sec):
+        before = [i for i in spoken if times[i][1] <= a_sec * 1000 + 60]
+        if not before:
+            return cfg.get("maxPause", MAX_PAUSE)
+        i = before[-1]
+        nxt = next((j for j in spoken if j > i), None)
+        gap = text[i + 1:nxt] if nxt is not None else text[i + 1:]
+        new_line = nxt is not None and any(i < ls <= nxt for ls in line_starts)
+        if "..." in gap or "…" in gap:
+            cap = 0.55
+        elif any(c in gap for c in ".!?。！？"):
+            cap = 0.5 if new_line else 0.45
+        elif "[" in gap:
+            cap = 0.45
+        elif any(c in gap for c in ",;:，；：、—–"):
+            cap = 0.28
+        else:
+            cap = 0.2
+        return cap * pause_scale
+
+    dur = dur_s(audio)
+    cuts = []
+    for a, b in silences(audio, noise_db=-50):
+        if a <= 0.01:
+            if b - EDGE_KEEP > 0.02:
+                cuts.append((0.0, b - EDGE_KEEP))
+        elif b >= dur - 0.01:
+            if dur - (a + EDGE_KEEP) > 0.02:
+                cuts.append((a + EDGE_KEEP, dur))
+        elif tighten and b - a > (cap := allowed_pause(a)):
+            cuts.append((a + cap / 2, b - cap / 2))
+
+    def tight(sec):
+        shift = 0.0
+        for a, b in cuts:
+            if sec >= b:
+                shift -= b - a
+            elif sec > a:
+                shift -= sec - a
+        return sec + shift
+
+    inserts = []
+    for i, l in enumerate(lines[:-1]):
+        want = l.get("pauseAfterMs")
+        if not want or not per_line[i] or not per_line[i + 1]:
+            continue
+        e, s = per_line[i][-1]["endMs"] / 1000, per_line[i + 1][0]["startMs"] / 1000
+        gap = tight(s) - tight(e)
+        if gap * 1000 < want:
+            mid = (e + s) / 2
+            for a, b in cuts:  # keep the insert point outside any cut region
+                if a < mid < b:
+                    mid = a
+            inserts.append((mid, (want / 1000) * tempo - gap))
+    wav = workdir / f"{scene_id}.wav"
+    remap = edit_audio(audio, wav, cuts, inserts)
+    for toks in per_line:
+        for t in toks:
+            t["startMs"] = round(remap(t["startMs"] / 1000) * 1000 / tempo)
+            t["endMs"] = round(remap(t["endMs"] / 1000) * 1000 / tempo)
+    if abs(tempo - 1.0) > 1e-3:
+        fast = workdir / f"{scene_id}_tempo.wav"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(wav), "-af", f"atempo={tempo:.4f}",
+                        "-c:a", "pcm_s16le", str(fast)], check=True)
+        wav = fast
+    polished = workdir / f"{scene_id}_polish.wav"
+    polish(wav, polished)
+    final = workdir / f"{scene_id}.mp3"
+    normalise(polished, final, cfg.get("targetLufs", TARGET_LUFS))
+    return final, lines_json(scene_id, lines, per_line), round(dur_s(final) * 1000)
+
+
+# ================================================================ QA + picking
+def qa_take(key, audio, text, lang, f0max, asr_engine=None, asr_result=None):
+    """Prosody always; ASR score when an engine is given (or an existing transcript is passed)."""
+    import voice_qa
+    qa_path = CACHE / "qa" / f"{key}.{asr_engine or 'p'}.json"
+    if qa_path.exists():
+        return json.loads(qa_path.read_text())
+    r = voice_qa.prosody(audio, fmax=f0max)
+    if asr_result is None and asr_engine:
+        asr_result = voice_qa.asr(audio, lang, asr_engine)
+    if asr_result is not None:
+        r |= voice_qa.score(text, lang, asr_result)
+    qa_path.parent.mkdir(parents=True, exist_ok=True)
+    qa_path.write_text(json.dumps(r, ensure_ascii=False))
+    return r
+
+
+def steady_reference(cut, exclude, current=()):
+    """Median pitch variation (semitones) of the picked takes of the other scenes
+    (this run's picks first, else the cut's last report)."""
+    rep_path = ROOT / "notes" / f"vo_report.{cut}.json"
+    rows = list(current) or (json.loads(rep_path.read_text()) if rep_path.exists() else [])
+    vals = sorted(t["qa"]["f0StdSt"] for r in rows if r["scene"] != exclude for t in r["takes"]
+                  if t["seed"] == r["picked"] and t["qa"].get("f0StdSt"))
+    return vals[len(vals) // 2] if vals else 4.5
+
+
+def pick(takes, block, cut, scene_id, report, manual):
+    """Manual pick wins. Else: accurate first (ASR error within 0.02 of the best take), then
+    expressive but not slow (one extra second must buy >= 0.8 semitones of pitch variation).
+    `"pick": "steady"`: the take closest to the cut's typical expressiveness instead."""
+    if manual is not None and any(t["seed"] == manual for t in takes):
+        return next(t for t in takes if t["seed"] == manual)
+    if len(takes) == 1:
+        return takes[0]
+    e0 = min(t["qa"].get("err", 0) for t in takes)
+    ok = [t for t in takes if t["qa"].get("err", 0) <= e0 + 0.02]
+    d0 = min(t["durationMs"] for t in ok)
+    if block.get("pick") == "steady":
+        ref = steady_reference(cut, scene_id, report)
+        return min(ok, key=lambda t: abs(t["qa"].get("f0StdSt", ref) - ref))
+    return max(ok, key=lambda t: t["qa"].get("f0StdSt", 0) - 0.8 * (t["durationMs"] - d0) / 1000)
+
+
+# ================================================================ commands
+def prepare_lines(block, strip):
+    """Lines with `say`: the string actually spoken (tts, falling back to text; tags stripped if needed)."""
+    return [dict(l, say=strip_tags(l.get("tts", l["text"])) if strip else l.get("tts", l["text"])) for l in block["lines"]]
+
+
+def log_paid(line):
+    (ROOT / "notes").mkdir(exist_ok=True)
+    with (ROOT / "notes" / "tts_log.md").open("a") as f:
+        f.write(f"- {dt.datetime.now().isoformat(timespec='seconds')} {line}\n")
+
+
+def build(args):
+    script = load_script()
+    cut = args.lang
+    if cut not in script.get("voices", {}):
+        sys.exit(f"scenes.json has no voices.{cut}")
+    cfg = dict(script["voices"][cut])
+    backend = args.backend or cfg.get("backend", "elevenlabs")
+    tl = cfg.get("lang", cut)  # text language: a variant cut can read another cut's text with its own voice
+    if backend != "none":
+        reexec_with(["numpy"])
+    voice, model, stability = args.voice or cfg.get("voice"), args.model or cfg.get("model", "eleven_v3"), cfg.get("stability", 0.5)
+    seeds = [int(x) for x in args.seeds.split(",")] if args.seeds else cfg.get("seeds", DEFAULT_SEEDS)[: args.takes]
+    defaults = script.get("defaults", {})
+    only = set(args.scene.split(",")) if args.scene else None
+    scenes = [s for s in script["scenes"] if tl in s and (only is None or s["id"] in only)]
+    if only and (missing := only - {s["id"] for s in scenes}):
+        sys.exit(f"unknown scene ids for {tl}: {', '.join(sorted(missing))}")
+    picks_path = ROOT / "notes" / f"vo_picks.{cut}.json"
+    picks = json.loads(picks_path.read_text()) if picks_path.exists() else {}
+    strip = backend != "elevenlabs"
+    tighten = args.tighten if args.tighten is not None else cfg.get("tighten", backend != "recorded")
+
+    # a manual pick is always part of its scene's pool, so a plain rebuild keeps it
+    pool = {sc["id"]: (seeds + ([picks[sc["id"]]] if picks.get(sc["id"]) is not None and picks[sc["id"]] not in seeds else []))
+            if backend == "elevenlabs" else [None] for sc in scenes}
+    print(f"[batch] cut={cut} text={tl} backend={backend} scenes={len(scenes)} voice={voice or '-'}")
+    remaining = None
+    if backend == "elevenlabs":
+        if not voice:
+            sys.exit(f"voices.{cut}.voice (an ElevenLabs voice id) is required")
+        todo, chars = [], 0
+        for sc in scenes:
+            text = " ".join(l["say"] for l in prepare_lines(sc[tl], strip))
+            for seed in pool[sc["id"]]:
+                if not (CACHE / "elevenlabs" / f"{el_key(text, voice, model, stability, seed, tl)}.mp3").exists():
+                    todo.append((sc["id"], seed))
+                    chars += len(text)
+        billable = round(chars * COST.get(model, 1.0))
+        remaining, sub = el_quota()
+        print(f"[quota] remaining={remaining} / {sub['character_limit']}")
+        print(f"[estimate] takes/scene={len(seeds)} new_requests={len(todo)} chars={chars} est_billable={billable} "
+              f"model={model} stability={stability}")
+        if billable > remaining:
+            sys.exit("ABORT: batch would exceed the remaining subscription quota")
+    if args.dry_run:
+        return
+
+    work = CACHE / "work" / cut
+    work.mkdir(parents=True, exist_ok=True)
+    out_audio = ROOT / "public" / "audio" / cut
+    vo_path = ROOT / "public" / "data" / f"vo.{cut}.json"
+    vo_path.parent.mkdir(parents=True, exist_ok=True)
+    old = json.loads(vo_path.read_text()) if vo_path.exists() else {}
+    keep = {s["id"]: s for s in old.get("scenes", [])} if old.get("version") == 2 else {}
+    report, new_requests = [], 0
+    for sc in scenes:
+        block = sc[tl]
+        lines = prepare_lines(block, strip)
+        text = " ".join(l["say"] for l in lines)
+        takes = []
+        if backend == "none":
+            times, dms = reading_times(lines, cfg)
+            per_line = [[t for t in tokenize(text, times) if a <= t["c0"] < b] for a, b in line_offsets(text, lines)]
+            takes.append({"seed": None, "final": None, "lines": lines_json(sc["id"], lines, per_line), "durationMs": dms, "qa": {},
+                          "fresh": False})
+        for seed in pool[sc["id"]] if backend != "none" else []:
+            asr_result = None
+            if backend == "elevenlabs":
+                key, audio, times, fresh = el_synth(text, voice, model, stability, seed, tl)
+            elif backend == "edge":
+                key, audio, times, fresh = edge_synth(text, cfg, tl)
+            else:
+                key, audio, times, fresh, asr_result = recorded_take(cut, sc["id"], text, tl, cfg)
+            new_requests += fresh
+            wd = work / f"{sc['id']}_{seed if seed is not None else backend}"
+            wd.mkdir(exist_ok=True)
+            final, lj, dms = process_take(sc["id"], lines, text, times, audio, wd, cfg, tighten)
+            engine = "scribe" if backend == "elevenlabs" else ("whisper" if args.asr and asr_result is None else None)
+            q = qa_take(key, audio, text, tl, cfg.get("f0Max", 420.0), engine, asr_result)
+            takes.append({"seed": seed, "final": final, "lines": lj, "durationMs": dms, "qa": q, "fresh": fresh})
+        best = pick(takes, {"pick": block.get("pick", sc.get("pick"))}, cut, sc["id"], report, picks.get(sc["id"]))
+        for t in takes:
+            q = t["qa"]
+            print(f" {'*' if t is best else ' '} {sc['id']:16} seed={str(t['seed']):<4} {t['durationMs'] / 1000:5.1f}s "
+                  f"err={q.get('err', '-')} f0std={q.get('f0StdSt', '-')} range={q.get('f0Range90St', '-')} "
+                  f"events={q.get('events', [])} {'silent' if backend == 'none' else 'new' if t['fresh'] else 'cached'}")
+            for d in q.get("diffs", [])[:4]:
+                print(f"      {d}")
+        if best["final"]:
+            out_audio.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(best["final"], out_audio / f"{sc['id']}.mp3")
+        keep[sc["id"]] = {"id": sc["id"], "audio": f"audio/{cut}/{sc['id']}.mp3" if best["final"] else None,
+                          "durationMs": best["durationMs"], "seed": best["seed"],
+                          "minSeconds": block.get("minSeconds", sc.get("minSeconds", 0)),
+                          "leadInMs": block.get("leadInMs", sc.get("leadInMs", defaults.get("leadInMs", 250))),
+                          "tailMs": block.get("tailMs", sc.get("tailMs", defaults.get("tailMs", 350))),
+                          "lines": best["lines"]}
+        report.append({"scene": sc["id"], "picked": best["seed"],
+                       "takes": [{k: v for k, v in t.items() if k in ("seed", "durationMs", "qa")} for t in takes]})
+    order = [s["id"] for s in script["scenes"] if tl in s]
+    vo = {"version": 2, "meta": {"lang": cut, "textLang": tl, "backend": backend, "voice": voice, "model": model if backend == "elevenlabs" else None,
+                                 "tempo": cfg.get("tempo", 1.0), "generated": dt.datetime.now().isoformat(timespec="seconds")},
+          "scenes": [keep[i] for i in order if i in keep]}
+    vo["meta"]["estimatedTotalMs"] = sum(max(s["minSeconds"] * 1000, s["leadInMs"] + s["durationMs"] + s["tailMs"]) for s in vo["scenes"])
+    vo_path.write_text(json.dumps(vo, ensure_ascii=False, indent=1))
+    rep_path = ROOT / "notes" / f"vo_report.{cut}.json"
+    rep_path.parent.mkdir(exist_ok=True)
+    merged = {r["scene"]: r for r in (json.loads(rep_path.read_text()) if rep_path.exists() else [])} | {r["scene"]: r for r in report}
+    rep_path.write_text(json.dumps([merged[i] for i in order if i in merged], ensure_ascii=False, indent=1))
+    if backend == "elevenlabs":
+        remaining2, _ = el_quota()
+        log_paid(f"build cut={cut} model={model} voice={voice} new_requests={new_requests} "
+                 f"remaining_before={remaining} remaining_after={remaining2}")
+        print(f"[quota] remaining {remaining2} (spent {remaining - remaining2})")
+    missing = [i for i in order if i not in keep]
+    print(f"[done] {vo_path.relative_to(ROOT)} total≈{vo['meta']['estimatedTotalMs'] / 1000:.1f}s"
+          + (f"  (not built yet: {', '.join(missing)})" if missing else ""))
+
+
+def audition(args):
+    """Same text, several voices (and models): listenable files + QA numbers side by side."""
+    script = load_script() if (ROOT / "scenes.json").exists() else {}
+    backend = args.backend or script.get("voices", {}).get(args.lang, {}).get("backend", "elevenlabs")
+    if backend not in ("elevenlabs", "edge"):
+        sys.exit("audition supports the elevenlabs and edge backends")
+    reexec_with(["numpy"])
+    text = args.text or AUDITION_TEXT.get(args.lang.split("-")[0])
+    if not text:
+        sys.exit("give --text for this language")
+    if backend == "edge":
+        text = strip_tags(text)
+    voices = [v.split("=", 1) if "=" in v else (v, v) for v in args.voices.split(",")]
+    models = args.model.split(",") if backend == "elevenlabs" else ["edge"]
+    remaining = None
+    if backend == "elevenlabs":
+        todo = [(n, v, m) for n, v in voices for m in models
+                if not (CACHE / "elevenlabs" / f"{el_key(text, v, m, args.stability, args.seed, args.lang)}.mp3").exists()]
+        billable = round(sum(len(text) * COST.get(m, 1.0) for _, _, m in todo))
+        remaining, _ = el_quota()
+        print(f"[quota] remaining={remaining}  [audition] {len(voices)} voices x {len(models)} models, new={len(todo)}, "
+              f"chars/text={len(text)}, est_billable={billable}")
+        if billable > remaining:
+            sys.exit("ABORT: audition would exceed the remaining quota")
+    if args.dry_run:
+        return
+    outdir = ROOT / "out" / "auditions"
+    outdir.mkdir(parents=True, exist_ok=True)
+    for name, v in voices:
+        for m in models:
+            if backend == "elevenlabs":
+                key, mp3, _, _ = el_synth(text, v, m, args.stability, args.seed, args.lang)
+            else:
+                key, mp3, _, _ = edge_synth(text, {"voice": v, "rate": args.rate}, args.lang)
+            dst = outdir / f"{args.lang}_{name}_{m.replace('eleven_', '')}.mp3"
+            shutil.copyfile(mp3, dst)
+            engine = "scribe" if backend == "elevenlabs" else ("whisper" if args.asr else None)
+            q = qa_take(key, mp3, text, args.lang, args.f0max, engine)
+            print(f"  {name:12} {m:26} {q['durationS']:5.1f}s f0med={q.get('f0MedianHz')} f0std={q.get('f0StdSt')} "
+                  f"range={q.get('f0Range90St')} loudStd={q.get('loudStdDb')} pauses={q['pauses']} max={q['pauseMaxS']} "
+                  f"err={q.get('err', '-')} events={q.get('events', [])}  -> {dst.relative_to(ROOT)}")
+            for d in q.get("diffs", [])[:5]:
+                print(f"      {d}")
+    if backend == "elevenlabs":
+        remaining2, _ = el_quota()
+        log_paid(f"audition lang={args.lang} models={args.model} voices={args.voices} remaining_before={remaining} "
+                 f"remaining_after={remaining2}")
+        print(f"[quota] remaining {remaining2}")
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd", required=True)
+    b = sub.add_parser("build", help="build all (or some) scenes of one cut")
+    b.add_argument("--lang", default="en", help="cut id = key in scenes.json voices (e.g. en, zh, zh_vertical)")
+    b.add_argument("--backend", choices=["elevenlabs", "edge", "recorded", "none"], help="override voices.<cut>.backend")
+    b.add_argument("--voice", help="override voices.<cut>.voice")
+    b.add_argument("--model", help="override voices.<cut>.model (elevenlabs)")
+    b.add_argument("--scene", help="comma-separated scene ids (others keep their previous build)")
+    b.add_argument("--seeds", help="comma-separated seeds, e.g. to widen one scene's pool (elevenlabs)")
+    b.add_argument("--takes", type=int, help="use only the first N configured seeds (elevenlabs)")
+    b.add_argument("--tighten", action=argparse.BooleanOptionalAction, default=None,
+                   help="shorten long interior pauses (default: on, off for recorded)")
+    b.add_argument("--asr", action="store_true", help="also ASR-check edge takes with local faster-whisper")
+    b.add_argument("--dry-run", action="store_true", help="print the plan (and ElevenLabs quota estimate) only")
+    a = sub.add_parser("audition", help="compare voices on one short text")
+    a.add_argument("--lang", default="en")
+    a.add_argument("--backend", choices=["elevenlabs", "edge"])
+    a.add_argument("--voices", required=True, help="name=voice_id,... (edge: name=en-US-AndrewNeural,...)")
+    a.add_argument("--model", default="eleven_v3", help="comma-separated ElevenLabs models")
+    a.add_argument("--stability", type=float, default=0.5)
+    a.add_argument("--seed", type=int, default=7)
+    a.add_argument("--rate", default="+0%", help="edge speaking rate, e.g. +8%%")
+    a.add_argument("--text")
+    a.add_argument("--asr", action="store_true", help="edge: ASR-check with faster-whisper")
+    a.add_argument("--f0max", type=float, default=420.0)
+    a.add_argument("--dry-run", action="store_true")
+    args = p.parse_args()
+    build(args) if args.cmd == "build" else audition(args)
+
+
+if __name__ == "__main__":
+    if sys.argv[1:2] == ["_edge"]:
+        _edge_worker(sys.argv[2:])
+    else:
+        main()

@@ -1,0 +1,17 @@
+{
+  "_comment": "Merge into the new project's package.json. All remotion / @remotion/* packages MUST share one exact version: replace 4.0.529 with the `remotion` version that create-video installed (or run `npx remotion upgrade` afterwards). Equivalent: npx remotion add @remotion/media @remotion/fonts @remotion/google-fonts && npm i katex && npm i -D @types/katex",
+  "dependencies": {
+    "@remotion/fonts": "4.0.529",
+    "@remotion/google-fonts": "4.0.529",
+    "@remotion/media": "4.0.529",
+    "katex": "^0.18.9"
+  },
+  "optionalDependencies_comment": "Useful but not required by the template: @remotion/paths, @remotion/shapes, @remotion/noise, @remotion/transitions (same exact version).",
+  "devDependencies": {
+    "@types/katex": "^0.16.8"
+  },
+  "scripts": {
+    "dev": "remotion studio",
+    "lint": "eslint src && tsc"
+  }
+}

@@ -1,0 +1,10 @@
+/* Semantic colours for KaTeX. Use the \A{..} / \B{..} / \H{..} / \D{..} macros (see components/core.tsx),
+   which expand to \htmlClass{c-...}{..}. Keep these in sync with `color` in theme/index.ts. */
+.c-accent { color: #5CC8E8; }
+.c-accent2 { color: #F5C862; }
+.c-highlight { color: #FF8A4C; }
+.c-dim { color: #6B7581; }
+.c-text2 { color: #A7B0BB; }
+
+.katex { line-height: 1.25; }
+.katex-display { margin: 0; }

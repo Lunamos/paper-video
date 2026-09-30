@@ -1,0 +1,273 @@
+{
+ "version": 2,
+ "meta": {
+  "lang": "en",
+  "backend": "none",
+  "note": "PLACEHOLDER timings (no audio). Regenerate with the voice-over pipeline.",
+  "estimatedTotalMs": 13031
+ },
+ "scenes": [
+  {
+   "id": "s_example",
+   "audio": "audio/en/s_example.mp3",
+   "durationMs": 13031,
+   "minSeconds": 12,
+   "leadInMs": 500,
+   "tailMs": 900,
+   "chapter": "Example",
+   "lines": [
+    {
+     "id": "a",
+     "text": "A pendulum's swing time depends on just one thing: its length.",
+     "startMs": 0,
+     "endMs": 3945,
+     "words": [
+      {
+       "w": "A",
+       "startMs": 0,
+       "endMs": 248,
+       "sp": 0
+      },
+      {
+       "w": "pendulum's",
+       "startMs": 300,
+       "endMs": 735,
+       "sp": 1
+      },
+      {
+       "w": "swing",
+       "startMs": 788,
+       "endMs": 1035,
+       "sp": 1
+      },
+      {
+       "w": "time",
+       "startMs": 1088,
+       "endMs": 1335,
+       "sp": 1
+      },
+      {
+       "w": "depends",
+       "startMs": 1388,
+       "endMs": 1766,
+       "sp": 1
+      },
+      {
+       "w": "on",
+       "startMs": 1819,
+       "endMs": 2066,
+       "sp": 1
+      },
+      {
+       "w": "just",
+       "startMs": 2119,
+       "endMs": 2366,
+       "sp": 1
+      },
+      {
+       "w": "one",
+       "startMs": 2419,
+       "endMs": 2666,
+       "sp": 1
+      },
+      {
+       "w": "thing:",
+       "startMs": 2719,
+       "endMs": 3079,
+       "sp": 1
+      },
+      {
+       "w": "its",
+       "startMs": 3266,
+       "endMs": 3514,
+       "sp": 1
+      },
+      {
+       "w": "length.",
+       "startMs": 3566,
+       "endMs": 3945,
+       "sp": 1
+      }
+     ],
+     "anchors": {
+      "pendulum": 300,
+      "length": 3566
+     }
+    },
+    {
+     "id": "b",
+     "text": "The period is two pi times the square root of L over g.",
+     "startMs": 4470,
+     "endMs": 8542,
+     "words": [
+      {
+       "w": "The",
+       "startMs": 4470,
+       "endMs": 4718,
+       "sp": 0
+      },
+      {
+       "w": "period",
+       "startMs": 4770,
+       "endMs": 5130,
+       "sp": 1
+      },
+      {
+       "w": "is",
+       "startMs": 5182,
+       "endMs": 5430,
+       "sp": 1
+      },
+      {
+       "w": "two",
+       "startMs": 5482,
+       "endMs": 5730,
+       "sp": 1
+      },
+      {
+       "w": "pi",
+       "startMs": 5782,
+       "endMs": 6030,
+       "sp": 1
+      },
+      {
+       "w": "times",
+       "startMs": 6082,
+       "endMs": 6330,
+       "sp": 1
+      },
+      {
+       "w": "the",
+       "startMs": 6382,
+       "endMs": 6630,
+       "sp": 1
+      },
+      {
+       "w": "square",
+       "startMs": 6682,
+       "endMs": 7042,
+       "sp": 1
+      },
+      {
+       "w": "root",
+       "startMs": 7095,
+       "endMs": 7342,
+       "sp": 1
+      },
+      {
+       "w": "of",
+       "startMs": 7395,
+       "endMs": 7642,
+       "sp": 1
+      },
+      {
+       "w": "L",
+       "startMs": 7695,
+       "endMs": 7942,
+       "sp": 1
+      },
+      {
+       "w": "over",
+       "startMs": 7995,
+       "endMs": 8242,
+       "sp": 1
+      },
+      {
+       "w": "g.",
+       "startMs": 8295,
+       "endMs": 8542,
+       "sp": 1
+      }
+     ],
+     "anchors": {
+      "formula": 4770
+     }
+    },
+    {
+     "id": "c",
+     "text": "Make it four times longer, and each swing takes twice as long.",
+     "startMs": 9068,
+     "endMs": 12881,
+     "words": [
+      {
+       "w": "Make",
+       "startMs": 9068,
+       "endMs": 9315,
+       "sp": 0
+      },
+      {
+       "w": "it",
+       "startMs": 9368,
+       "endMs": 9615,
+       "sp": 1
+      },
+      {
+       "w": "four",
+       "startMs": 9668,
+       "endMs": 9915,
+       "sp": 1
+      },
+      {
+       "w": "times",
+       "startMs": 9968,
+       "endMs": 10215,
+       "sp": 1
+      },
+      {
+       "w": "longer,",
+       "startMs": 10268,
+       "endMs": 10646,
+       "sp": 1
+      },
+      {
+       "w": "and",
+       "startMs": 10834,
+       "endMs": 11081,
+       "sp": 1
+      },
+      {
+       "w": "each",
+       "startMs": 11134,
+       "endMs": 11381,
+       "sp": 1
+      },
+      {
+       "w": "swing",
+       "startMs": 11434,
+       "endMs": 11681,
+       "sp": 1
+      },
+      {
+       "w": "takes",
+       "startMs": 11734,
+       "endMs": 11981,
+       "sp": 1
+      },
+      {
+       "w": "twice",
+       "startMs": 12034,
+       "endMs": 12281,
+       "sp": 1
+      },
+      {
+       "w": "as",
+       "startMs": 12334,
+       "endMs": 12581,
+       "sp": 1
+      },
+      {
+       "w": "long.",
+       "startMs": 12634,
+       "endMs": 12881,
+       "sp": 1
+      }
+     ],
+     "anchors": {
+      "chart": 9668,
+      "twice": 12034
+     }
+    }
+   ]
+  }
+ ]
+}

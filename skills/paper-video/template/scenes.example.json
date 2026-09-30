@@ -1,0 +1,134 @@
+{
+  "version": 2,
+  "fps": 30,
+  "notes": "Script source of truth. Per scene and language: lines with text (captions), tts (what is spoken: respellings, sparse audio tags), anchors (name -> EN: first word containing it; ZH: substring), optional pauseAfterMs. Line ids mean the same thing in every language. The voice-over pipeline turns this into public/data/vo.<cut>.json.",
+  "defaults": {
+    "leadInMs": -200,
+    "tailMs": 650
+  },
+  "_voices_doc": {
+    "elevenlabs": "voice (voice id), voiceName, model, stability, seeds (takes per scene; best one auto-picked), tempo (atempo), maxPause (s), pauseScale",
+    "edge": "voice (an edge-tts voice name), rate (e.g. '+0%'), pitch (e.g. '+0Hz'); free, no key",
+    "recorded": "dir (folder with one file per scene: <scene id>.<format>), format; word timings come from ASR",
+    "none": "no audio; timings are estimated from wpm (EN) / cps (ZH) so picture and captions can be built first"
+  },
+  "voices": {
+    "en": {
+      "backend": "elevenlabs",
+      "voice": "<VOICE_ID>",
+      "voiceName": "<voice name>",
+      "model": "eleven_v3_conversational",
+      "stability": 0.5,
+      "seeds": [11, 23, 37],
+      "tempo": 1.0,
+      "maxPause": 0.28,
+      "pauseScale": 1.0
+    },
+    "zh": {
+      "backend": "edge",
+      "voice": "zh-CN-YunxiNeural",
+      "rate": "+0%",
+      "pitch": "+0Hz",
+      "maxPause": 0.25
+    },
+    "en-draft": {
+      "backend": "none",
+      "text": "en",
+      "wpm": 165
+    }
+  },
+  "music": {
+    "backend": "elevenlabs",
+    "globalStyles": ["minimal ambient electronic", "warm analog synth pads", "gentle felt piano", "curious, clean modern science explainer", "instrumental"],
+    "negativeStyles": ["vocals", "heavy drums", "EDM drop", "cinematic trailer hits", "busy melody that competes with narration"],
+    "targetLufs": -17.4,
+    "endRingOutMs": 1500
+  },
+  "scenes": [
+    {
+      "id": "s_intro",
+      "chapter": "Intro",
+      "musicStyles": ["sparse and curious", "soft synth swell", "sense of discovery"],
+      "en": {
+        "minSeconds": 8,
+        "leadInMs": 500,
+        "lines": [
+          {
+            "id": "a",
+            "text": "Grandfather clocks tick at a steady beat. Why that beat, and not faster?",
+            "tts": "[curious] Grandfather clocks tick at a steady beat... Why that beat, and not faster?",
+            "anchors": { "clock": "clocks", "why": "Why" },
+            "pauseAfterMs": 300
+          }
+        ]
+      },
+      "zh": {
+        "minSeconds": 8,
+        "leadInMs": 500,
+        "lines": [
+          {
+            "id": "a",
+            "text": "老式摆钟总是按固定的节拍走。为什么是这个节拍，而不是更快？",
+            "tts": "老式摆钟总是按固定的节拍走……为什么是这个节拍，而不是更快？",
+            "anchors": { "clock": "摆钟", "why": "为什么" },
+            "pauseAfterMs": 300
+          }
+        ]
+      }
+    },
+    {
+      "id": "s_example",
+      "chapter": "The formula",
+      "musicStyles": ["light and explanatory", "steady soft pulse", "gentle arpeggio"],
+      "en": {
+        "minSeconds": 12,
+        "tailMs": 900,
+        "pick": 23,
+        "lines": [
+          {
+            "id": "a",
+            "text": "A pendulum's swing time depends on just one thing: its length.",
+            "tts": "A pendulum's swing time depends on just one thing... its length.",
+            "anchors": { "pendulum": "pendulum", "length": "length" }
+          },
+          {
+            "id": "b",
+            "text": "The period is two pi times the square root of L over g.",
+            "tts": "The period is two pi, times the square root of L over g.",
+            "anchors": { "formula": "period" }
+          },
+          {
+            "id": "c",
+            "text": "Make it four times longer, and each swing takes twice as long.",
+            "tts": "Make it four times longer, and each swing takes [excited] twice as long.",
+            "anchors": { "chart": "four", "twice": "twice" }
+          }
+        ]
+      },
+      "zh": {
+        "minSeconds": 12,
+        "tailMs": 900,
+        "lines": [
+          {
+            "id": "a",
+            "text": "单摆摆一次要多久，只取决于一件事：摆长。",
+            "tts": "单摆摆一次要多久，只取决于一件事……摆长。",
+            "anchors": { "pendulum": "单摆", "length": "摆长" }
+          },
+          {
+            "id": "b",
+            "text": "周期等于二派乘以根号下 L 除以 g。",
+            "tts": "周期等于二派，乘以根号下 L 除以 g。",
+            "anchors": { "formula": "周期" }
+          },
+          {
+            "id": "c",
+            "text": "摆长变成四倍，每次摆动的时间就变成两倍。",
+            "tts": "摆长变成四倍，每次摆动的时间就变成两倍。",
+            "anchors": { "chart": "四倍", "twice": "两倍" }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+# scripts/
+
+Pipeline tools for the Remotion project. Run them from the project root (the folder holding
+`scenes.json`) or set `PAPER_VIDEO_ROOT`. Python 3.10+, standard library only; `numpy`,
+`edge-tts` and `faster-whisper` are pulled in automatically through `uv run --with ...` when a
+step needs them. `ffmpeg`/`ffprobe` must be on PATH. Keys are read from the environment or `.env`
+and are never printed.
+
+| Script | Purpose | Key? | Example |
+|---|---|---|---|
+| `vo.py` | Voice-over: one read per scene -> tighten pauses, min gaps, polish, normalise -> `public/audio/<cut>/*.mp3` + `public/data/vo.<cut>.json` (+ `notes/vo_report.<cut>.json`). Backends: `elevenlabs`, `edge`, `recorded`, `none` | only for `elevenlabs` | `python3 scripts/vo.py build --lang en` |
+| `vo.py audition` | Same short text in several voices, with QA numbers | only for `elevenlabs` | `python3 scripts/vo.py audition --lang en --backend edge --voices a=en-US-AndrewNeural,b=en-US-AvaNeural` |
+| `voice_qa.py` | Prosody stats (YIN pitch variation, pauses) + ASR round-trip (Scribe with a key, else local faster-whisper) | no (optional) | `python3 scripts/voice_qa.py public/audio/en/s_intro.mp3 --text "..." --asr` |
+| `music.py` | Music bed composed per chapter (ElevenLabs), or level your own royalty-free track -> `public/audio/bgm_<cut>.mp3` at -17.4 LUFS | only to generate | `python3 scripts/music.py --lang en --file track.mp3` |
+| `sfx_synth.py` | Procedural SFX (whoosh, pop, tick, hit, stamp, shimmer, riser, powerdown) -> `public/audio/sfx/` | no | `python3 scripts/sfx_synth.py` |
+| `srt.py` | Captions as `.srt` (same paging as the burned-in captions; CJK-style for zh/ja) | no | `python3 scripts/srt.py zh` |
+| `timeline_info.py` | Scene start frames, durations and anchor frames (as `timeline.ts` computes them) | no | `python3 scripts/timeline_info.py en` |
+| `zh_font_subset.py` | Local CJK font subset of exactly the characters used -> `public/fonts/zh/`, `src/theme/fonts-zh.json` | no | `python3 scripts/zh_font_subset.py` |
+| `contact_sheet.py` | Tile rendered stills into one review image | no | `python3 scripts/contact_sheet.py out/sheet.png out/stills/*.png` |
+| `finalize.sh` | Render a composition, two-pass loudnorm to -14 LUFS / -1.5 dBTP, AAC 320k 48 kHz, optional cover still | no | `scripts/finalize.sh VIDEO-EN video_en Cover-EN` |
+| `finalize_vertical.sh` | Same for a 1080x1920 cut, plus vertical cover stills | no | `scripts/finalize_vertical.sh VIDEO-Vertical video_zh_v Cover-ZH-3x4 Cover-ZH-9x16` |
+| `export_handoff.py` | For editing apps: silent picture (+ per-scene clips), voice/music/sfx stems, SRT, scene CSV, CMX3600 EDL | no | `python3 scripts/export_handoff.py VIDEO-EN --lang en --per-scene` |
+| `common.py` | Shared helpers (root, keys, loudness, timeline maths, uv runner) | - | imported |
+
+## scenes.json fields used here
+
+```jsonc
+{
+  "fps": 30,
+  "defaults": { "leadInMs": -200, "tailMs": 600 },   // negative leadInMs = J-cut (voice starts before the picture changes)
+  "voices": {                                         // one entry per cut
+    "en": { "backend": "elevenlabs", "voice": "<voice id>", "model": "eleven_v3_conversational",
+            "stability": 0.5, "seeds": [11, 23, 37], "tempo": 1.0, "pauseScale": 1.0, "f0Max": 420 },
+    "zh": { "backend": "edge", "voice": "zh-CN-YunxiNeural", "rate": "+0%", "pitch": "+0Hz" },
+    "zh_rec": { "backend": "recorded", "lang": "zh", "whisperModel": "small", "tighten": false },
+    "en_draft": { "backend": "none", "lang": "en", "cps": 15, "cpsCjk": 5 }
+  },                                                  // "lang": which text blocks a variant cut reads (default: the cut id)
+  "music": { "positive": [], "negative": [], "cutStyles": { "zh": [] }, "seed": 7 },
+  "scenes": [
+    { "id": "s_intro", "chapter": "intro", "musicStyles": ["sparse and curious"],
+      "en": { "minSeconds": 10, "leadInMs": 400, "tailMs": 500, "pick": "steady",
+              "lines": [ { "id": "a", "text": "Caption text (shown).", "tts": "[curious] Spoken text (tags, respellings).",
+                           "anchors": { "beat": "word" }, "pauseAfterMs": 400 } ] },
+      "zh": { "lines": [ ... ] } }
+  ]
+}
+```
+
+- `text` is what the captions show; `tts` (optional, defaults to `text`) is what is spoken. Timings
+  are aligned from `tts` onto `text`, so respellings (`twenty` for `20`) keep captions exact.
+- `anchors`: name -> word (latin: first matching word) or substring (CJK); the template turns them
+  into frames so animations land on the spoken word.
+- Audio tags (`[curious]`, `[excited]`, `[chuckles]` ...) only reach ElevenLabs v3; other backends strip them.
+- `recorded`: put narration at `recordings/<cut>/<scene_id>.wav|mp3|m4a|flac`.
+- `notes/vo_picks.<cut>.json` (`{"s_intro": 23}`) pins an ElevenLabs take by seed.
+
+## Limitations
+
+- ASR error counts spelled-out numbers vs digits as mismatches; compare takes relatively.
+- `edge` uses an unofficial Microsoft endpoint (free, may change or rate-limit); one take per scene.
+- `export_handoff.py` needs the template's `mute` prop; stem renders take roughly as long as a video render.
+- `music.py --file` does not loop a track shorter than the video.
