@@ -54,14 +54,14 @@ Two videos made with this workflow:
 With the [skills CLI](https://github.com/vercel-labs/skills):
 
 ```bash
-npx skills add Lunamos/paper-video
+npx skills add Lunamos/paper2video
 ```
 
 Or manually:
 
 ```bash
-git clone https://github.com/Lunamos/paper-video
-cp -r paper-video/skills/paper2video ~/.claude/skills/
+git clone https://github.com/Lunamos/paper2video
+cp -r paper2video/skills/paper2video ~/.claude/skills/
 ```
 
 You don't need to set up Remotion yourself. The skill tells Claude to:
