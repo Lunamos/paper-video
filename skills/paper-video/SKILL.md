@@ -37,6 +37,9 @@ Collect the material first (`reference/third-party.md` §1–2 if you only have 
 
 ## 3. Story, script and claims
 
+- **Length and focus come first.** Default: **3–4 minutes per cut, at most 4:00** unless the user asks for more — about 450–600 English words or 1,100–1,300 Chinese characters of narration. A video is not a reading of the paper: pick the **one finding** the whole film serves and the **2–3 pieces of evidence** that carry it, and give everything else one sentence or leave it for the description. Faithful means nothing is distorted, not that every section appears.
+- **Time budget** for a 4-minute film: hook 15–25 s (the paper's headline result is on screen, as real data, within the first 30 s) · primer 30–40 s · the evidence ≥ 40 % of the film · mechanism/theory ≤ 20 % and only what can be shown · limitations 15–25 s (the one to three that matter most) · takeaway ≤ 15 s. Derivations, extra experiments and lists of implications get a scene only if they can be shown with real data in ≤ 20–30 s.
+- **Cut before you pay**: `python3 scripts/vo.py build --lang <l> --dry-run` prints the film length estimated from reading speed (within ~5 % of the voiced length); trim the script until it fits, then generate the voice.
 - **Structure** (adapt, don't force): hook with the strongest real visual in the first ~10 s → a primer that lets a no-context viewer follow (what is the task/object, in plain words, animated) → the problem, shown with data → the idea → why it works (mechanism) → results, including the honest caveats → takeaway + where to find the paper/code. Put good visuals early; don't save them for the end.
 - **Write for the ear**: short sentences, one number per sentence, concrete nouns, no "Not X but Y" tics, no fake Q&A, even tone across scene boundaries (an abrupt "Now the fun part!" jars). Give formulas and charts a beat of silence.
 - Put the script in `scenes.json` (schema: `template/scenes.example.json`): per scene and language, lines with `text` (captions), `tts` (what is spoken: respellings, sparse audio tags), `anchors` (words that time visual beats), optional `pauseAfterMs`; per scene an optional `chapter`. Write each language natively rather than translating word for word; keep technical terms in English where the audience expects them.
@@ -54,7 +57,7 @@ Build the narration before animating (`reference/voice.md`): `scripts/vo.py buil
 
 - You build the theme, shared components and anything reused across scenes first (see `reference/visual-style.md`); then scenes can be parallelised across subagents with **explicit file ownership** (one scene set per agent, nobody edits shared files — they report requested changes back to you). Give each agent: `CLAUDE.md`, the storyboard entry, the `scenes.json` lines and anchor names, the data files, the style rules, the chapter number and title for each of its scenes (parallel agents otherwise number their chapter tags independently), and the requirement to render and inspect stills in every language before reporting (`scripts/review.py`). Afterwards re-run `scripts/zh_font_subset.py` once: new Chinese characters fall back to a system font until then.
 - Every scene: headline, beats driven by anchors (with fallbacks), a source line on data shots, SCHEMATIC on illustrations, both languages' on-screen strings, content clear of the caption band.
-- Review: render stills at anchor-based frames for the whole film in every language and tile them into contact sheets (`scripts/review.py <Composition> <cut> [--scenes ...]`, one bundle for all frames), and look — overlaps, clipping, empty frames, illegible text, anything off-message. Iterate.
+- Review: render stills at anchor-based frames for the whole film in every language and tile them into contact sheets (`scripts/review.py <Composition> <cut> [--scenes ...]`, one bundle for all frames), and look — overlaps, clipping, empty frames, illegible text, anything off-message. Then review the **pacing**, reading the sheets as the story a viewer gets: flag any stretch over ~20 s without a new real visual, any list of three or more items read out, any formula or theory that is not tied to data on screen, and any scene that does not move the one finding forward — compress or cut those. Iterate.
 
 ## 7. Independent fact-check
 
@@ -77,6 +80,7 @@ Expect feedback on tone, pacing, clarity and specific frames (they quote timesta
 
 ## Hard-won rules (short list — details in the references)
 
+- Focus over coverage: ≤ 4 minutes, one finding, its best evidence, the caveats that matter; a viewer who is bored at minute three never sees the rest.
 - Truth over hype: no number without a source; don't state claims more strongly than the paper; show caveats the paper states.
 - Real data on real-data charts; illustrations labelled SCHEMATIC; no count-up number animations; bars from zero unless the axis says log.
 - No full-frame shake/punch-in/zoom effects — emphasise the specific card; full-frame scale changes also caused visible text jitter in renders.

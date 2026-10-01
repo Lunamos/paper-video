@@ -144,6 +144,19 @@ def reading_times(lines, cfg) -> tuple[list[tuple[int, int]], int]:
     return times, round(t)
 
 
+def estimate_length(scenes, tl, cfg, defaults, strip) -> float:
+    """Film length in seconds from reading speed (EN ~150 wpm, ZH ~5 characters/s incl. pauses) plus each scene's
+    lead-in/tail - within ~10 % of the voiced length, good enough to cut the script to length before paying."""
+    total = 0.0
+    for sc in scenes:
+        block = sc[tl]
+        _, ms = reading_times(prepare_lines(block, strip), {"cps": cfg.get("cps", 15.0), "cpsCjk": cfg.get("cpsCjk", 5.0)})
+        lead = block.get("leadInMs", sc.get("leadInMs", defaults.get("leadInMs", 250)))
+        tail = block.get("tailMs", sc.get("tailMs", defaults.get("tailMs", 350)))
+        total += max(block.get("minSeconds", sc.get("minSeconds", 0)), (lead + ms + tail) / 1000)
+    return total
+
+
 # ================================================================ elevenlabs
 def el_req(path, payload=None, timeout=240):
     r = urllib.request.Request(API + path, data=json.dumps(payload).encode() if payload is not None else None,
@@ -690,6 +703,9 @@ def build(args):
               f"model={model} stability={stability}")
         if billable > remaining:
             sys.exit("ABORT: batch would exceed the remaining subscription quota")
+    est = estimate_length(scenes, tl, cfg, defaults, strip)
+    print(f"[length] ≈ {est // 60:.0f}:{est % 60:02.0f} from reading speed (target ≤ 4:00 unless the user asked for more; "
+          f"trim the script before paying for voice if it is over)")
     if args.dry_run:
         return
 
