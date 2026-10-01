@@ -20,12 +20,20 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   screen, big objects that run off the frame edges — not a 16:9 chart shrunk into the middle.
 - Sizes at 1080 wide: headline 100–140 px bold; key phrase 72–96 px; hero number 180–260 px; labels ≥ 44 px (never
   < 36); captions 60–72 px bold with a dark stroke, ≤ 2 lines, ≈ 9–10 Chinese characters or ≈ 18 Latin characters per
-  line, broken between words (Chinese: `Intl.Segmenter`), Chinese punctuation replaced by spaces.
+  line, broken between words, Chinese punctuation replaced by spaces. For Chinese, precompute word boundaries with jieba
+  (a small script over the caption words of `vo.zh.json` → a JSON table of allowed break offsets per line): the
+  renderer's `Intl.Segmenter` splits e.g. 金门大桥 as 金门|大|桥, which puts 「桥」 alone on the next caption page.
 - The only small text: the source line (≈ 26 px) and honesty chips (≈ 34 px) — rigor survives the format change.
 - At most three elements at once (focus, one label or headline, the caption), one thing moving at a time.
 - Charts: ≤ 4–5 bars or ≤ 3 lines, 2–4 ticks, direct labels instead of legends, no grid, ours highlighted, bars from
   zero. Formulas: one line of ≤ ~15 symbols at ≥ 100 px, built term by term — or leave them to the 16:9 film.
 - Long text (model outputs, examples): the one or two sentences that matter, very big, key words highlighted.
+- Filling the frame works best with the subject itself: a tower of layers running top to bottom, a bridge whose towers
+  reach the top band and whose reflection fills the bottom, real trajectories running off the edges, a chat window from
+  top to bottom, a field covering the whole frame. A dim texture of real text (all concept names, the whole email)
+  can fill bands too, but keep it quiet (≈ half the normal opacity) so it never becomes a second focus.
+- Pictures now run under text: give source lines and labels a soft dark halo or plate.
+- Loop: the end scene should import the intro's frame-0 constants (or a shared component) instead of copying values.
 
 ## Pacing and structure
 - **Frame 0 is the hook**: the subject on screen with a claim of ≤ 7 words at ≥ 110 px — no logo, black frame or fade-in.
@@ -36,13 +44,23 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   works well as the last line.
 - On Bilibili, knowledge videos are still mostly landscape: the vertical cut is a companion to the 16:9 upload.
 
-## Building it (Remotion)
-- A vertical timeline = the cut's scenes minus the left-out ones, laid back to back; each scene keeps its own anchors.
-- Voice: each kept scene's clip at its new start. SFX: resolve cues against the vertical timeline (cues of left-out
-  scenes disappear). Music: play the score **per scene from that scene's position in the original score** (`trimBefore`
-  = original start), with ~10-frame fades where the cut jumps over a left-out scene — no new music file needed.
-- One vertical component per scene (keyed to the same anchors), reusing the film's data files and honesty labels;
-  shared kit: safe-area constants, big captions, headline / big number / chip / source components. Scenes can be built
-  in parallel by subagents with explicit file ownership, reviewed with per-scene contact sheets at every anchor.
-- Components that draw into a fixed 16:9 canvas (SVG 1920×1080) need a rect in canvas coordinates and a positioned
-  wrapper to be placed in the 9:16 frame.
+## Building it (the template's `src/vertical/`)
+- `layout.ts`: the safe-area and type constants above, and `V_DROP` (scenes the phone cut skips; their audio is
+  simply not played — check that the next scene's first line still follows).
+- `VKit.tsx`: `VHead` (headline), `Hot` (accent word), `VSub`, `VChip` (honesty tag), `VSource` / `VSourceLines`
+  (source lines with a dark halo), `VBigNumber` (final value only), `VPanel`, `VBackdrop` (a full-frame backdrop — the
+  16:9 grain layer would stop at y = 1080).
+- `VCaptions.tsx`: ≤ 2 lines, words bright as spoken, broken between words (Chinese: `scripts/zh_breaks.py` →
+  `public/data/zh_breaks.json`, run after every Chinese voice build), auto-shrinks a page that would not fit.
+- `VerticalFilm.tsx`: the vertical timeline (the cut's scenes minus `V_DROP`, back to back, each keeping its anchors),
+  voice per scene, SFX resolved on the vertical timeline, and the music played **per scene from that scene's position in
+  the original score** (10-frame fades where the cut jumps over a left-out scene) — no new music file. Compositions
+  `<PREFIX>-V-ZH` / `<PREFIX>-V-EN`, plus `V-<Name>` previews of single scenes.
+- `scenes/`: one component per scene (`VExample.tsx` shows the pattern), registered in `scenes/registry.ts`. They reuse
+  the 16:9 film's data files and honesty labels; components that draw on a fixed 1920×1080 canvas get a rect in canvas
+  coordinates and a positioned wrapper.
+- Workflow: write `notes/vertical_storyboard.md` (per scene: the one picture that fills the frame, the beats per anchor)
+  → scene subagents with explicit file ownership (they study an approved vertical cut for the style) → review every
+  anchor with `python3 scripts/vreview.py [--scenes …]` (contact sheets per scene) → fix → render with
+  `scripts/finalize.sh <PREFIX>-V-ZH <name>_zh_vertical` → check the first and last frames match (loop) and sample a
+  frame every 5–6 s of the final file to see the pacing.

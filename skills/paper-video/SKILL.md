@@ -71,7 +71,7 @@ Music (optional, `scripts/music.py` or a user-supplied royalty-free track) ducke
 
 ## 9. Deliverables and handoff
 
-Per `reference/platforms.md`: horizontal cuts per language, optional vertical cut (native 9:16 layouts, `reference/vertical.md`), covers (16:9 and vertical), SRTs, and `out/social_copy.md` with titles/descriptions/chapters per platform (plus any other platform the user asks for — research its current conventions then). If the user wants to finish in an editor or bring their own footage, follow `reference/handoff.md`.
+Per `reference/platforms.md`: horizontal cuts per language, a vertical cut for phones (native 9:16 scenes from the template's `src/vertical/`, same audio, `reference/vertical.md`), covers (16:9 and vertical), SRTs, and `out/social_copy.md` with titles/descriptions/chapters per platform (plus any other platform the user asks for — research its current conventions then). If the user wants to finish in an editor or bring their own footage, follow `reference/handoff.md`.
 
 ## Running on a headless machine
 Everything works without a display or GPU: Remotion renders with headless Chrome (downloaded on first use; on Linux it needs the usual shared libraries — `npx remotion browser ensure` reports what is missing), the Python/ffmpeg tools are CLI-only, faster-whisper runs on CPU. Preview by rendering stills/MP4s, or run `npx remotion studio` and forward the port (`ssh -L 3000:localhost:3000 host`). Install Node (nvm), `uv` and a static ffmpeg in the user's home directory if there is no root.

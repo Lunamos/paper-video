@@ -1,4 +1,6 @@
 import { Composition, Folder, Still } from "remotion";
+import { calcVFilmMetadata, calcVSceneMetadata, VerticalFilm, VScenePreview } from "./vertical/VerticalFilm";
+import { VSCENES } from "./vertical/scenes/registry";
 import { Cover, CoverBili, CoverV } from "./Cover";
 import { SCENES } from "./scenes/registry";
 import { calcVerticalMetadata, VerticalVideo } from "./Vertical";
@@ -56,6 +58,25 @@ export const RemotionRoot: React.FC = () => {
         durationInFrames={300}
         calculateMetadata={calcVerticalMetadata}
       />
+
+      {/* vertical-native cuts (9:16, own scene layouts, same audio): src/vertical/, reference/vertical.md */}
+      <Composition id={`${PREFIX}-V-ZH`} component={VerticalFilm} width={1080} height={1920} fps={30} durationInFrames={300} defaultProps={{ lang: "zh" as const }} calculateMetadata={calcVFilmMetadata} />
+      <Composition id={`${PREFIX}-V-EN`} component={VerticalFilm} width={1080} height={1920} fps={30} durationInFrames={300} defaultProps={{ lang: "en" as const }} calculateMetadata={calcVFilmMetadata} />
+      <Folder name="Vertical-scenes">
+        {VSCENES.map((s) => (
+          <Composition
+            key={s.id}
+            id={`V-${s.name}`}
+            component={VScenePreview}
+            width={1080}
+            height={1920}
+            fps={30}
+            durationInFrames={300}
+            defaultProps={{ sceneId: s.id, lang: "zh" as const }}
+            calculateMetadata={calcVSceneMetadata}
+          />
+        ))}
+      </Folder>
 
       <Folder name="Covers">
         <Still id="Cover-EN" component={Cover} width={1920} height={1080} defaultProps={{ lang: "en" as const }} />

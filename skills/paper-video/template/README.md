@@ -26,7 +26,8 @@ Rename the composition prefix once in `src/Root.tsx` (`PREFIX = "VIDEO"`) and th
 src/
   index.ts, Root.tsx          compositions: <PREFIX>-EN, <PREFIX>-ZH, <PREFIX>-Vertical, Covers/*, Scenes-EN/*, Scenes-ZH/*
   Video.tsx                   MainVideo (props below), SceneShell, SceneFade, VoiceTrack, Bgm, Sfx, ScenePreview
-  Vertical.tsx                1080×1920 cut; all text in VERTICAL
+  Vertical.tsx                draft 1080×1920 cut (16:9 film in a band); all text in VERTICAL
+  vertical/                   the native phone cut: layout.ts, VKit.tsx, VCaptions.tsx, VerticalFilm.tsx, scenes/
   Cover.tsx                   Cover (16:9) / CoverV (3:4, 9:16); text in COVER, hero visual slot
   theme/index.ts              color / font / type / layout / ease / clamp tokens
   theme/fonts-zh.json         optional local CJK font subset (placeholder: no files -> system fallback)
@@ -154,7 +155,12 @@ ones are dropped). Caption text is the `words[].w` from the vo JSON, so fix capt
 
 ## Vertical cut and covers
 
-- `Vertical.tsx`: edit `VERTICAL` (lang, cut, kicker, title, subtitle `[before, accented, after]`, authors, credit,
+- **Vertical cut for phones: `src/vertical/`** (compositions `<PREFIX>-V-ZH` / `-V-EN`, scene previews `V-<Name>`).
+  Same audio, own 9:16 scenes: big type, one focus per beat, the picture filling the whole frame, text inside the
+  platforms' safe area (`layout.ts`). Add one component per scene to `vertical/scenes/` (pattern: `VExample.tsx`) and
+  register it; list scenes to skip in `V_DROP`; run `scripts/zh_breaks.py` for Chinese captions; review with
+  `scripts/vreview.py`. See `reference/vertical.md`.
+- `Vertical.tsx` (quick draft only — its text is too small on a phone): edit `VERTICAL` (lang, cut, kicker, title, subtitle `[before, accented, after]`, authors, credit,
   `chapters: { sceneId: name }`, falling back to the vo JSON `chapter`). The 16:9 film is re-rendered at 0.6 scale
   (60 px cropped per side) in a band at y=520; progress bar and larger captions below; the bottom ~20% stays free for
   platform UI.
