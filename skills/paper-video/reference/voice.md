@@ -14,7 +14,7 @@
 Default: ElevenLabs if a key is present, else edge; tell the user which and why, and offer the others. Other good options exist (local open-source TTS such as CosyVoice / IndexTTS / F5-TTS / Kokoro, or commercial ones) — add a backend only if the user wants it; anything that yields audio + word timings plugs in, and forced alignment (faster-whisper) can supply timings for any audio.
 
 ## Casting
-Audition 3–4 candidate voices per language with two or three representative sentences (`vo.py audition`), cheap/fast model for drafts, best model for finals. Prefer a library voice with native pronunciation for each language. Don't imitate or clone any real person's voice without their consent (e.g. a character's voice actor); the user's own voice is fine.
+Audition 3–4 candidate voices per language with two or three representative sentences (`vo.py audition`), cheap/fast model for drafts, best model for finals. Use the newest TTS model the account offers (`GET /v1/models`; in October 2026 that is `eleven_v4`, the template default). When a new model appears, audition one real scene in the old and the new model with the same voice before switching: in one test, v4 was more expressive in English and, in Chinese, read a model name correctly where v3 misread it (千问 → 千万). Audio tags and timestamps work with v4 as with v3. Prefer a library voice with native pronunciation for each language. Don't imitate or clone any real person's voice without their consent (e.g. a character's voice actor); the user's own voice is fine.
 
 ## Generation strategy that sounds alive
 - **One request per scene**, not per sentence — sentence-by-sentence synthesis sounds stiff and starts every sentence cold.

@@ -18,7 +18,7 @@
       "backend": "elevenlabs",
       "voice": "<VOICE_ID>",
       "voiceName": "<voice name>",
-      "model": "eleven_v3_conversational",
+      "model": "eleven_v4",
       "stability": 0.5,
       "seeds": [11, 23, 37],
       "tempo": 1.0,

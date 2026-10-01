@@ -31,7 +31,7 @@ Keys are only read from the environment or .env and are never printed or written
 
 Usage:
   python3 scripts/vo.py build --lang en [--scene s_intro,s_method] [--seeds 11,23] [--takes 2] [--dry-run]
-  python3 scripts/vo.py audition --lang en --voices a=VOICE_ID,b=VOICE_ID [--model eleven_v3] [--text "..."]
+  python3 scripts/vo.py audition --lang en --voices a=VOICE_ID,b=VOICE_ID [--model eleven_v4,eleven_v3] [--text "..."]
   python3 scripts/vo.py audition --lang zh --backend edge --voices yunxi=zh-CN-YunxiNeural,xiaoxiao=zh-CN-XiaoxiaoNeural
 (numpy / edge-tts / faster-whisper are pulled in through `uv run --with ...` when needed.)
 """
@@ -57,7 +57,7 @@ from common import (CJK, ROOT, dur_s, env_key, load_script, normalise, reexec_wi
 
 CACHE = ROOT / "audio_cache"
 API = "https://api.elevenlabs.io"
-COST = {"eleven_v3": 1.0, "eleven_v3_conversational": 0.5, "eleven_multilingual_v2": 1.0, "eleven_flash_v2_5": 0.5,
+COST = {"eleven_v4": 1.0, "eleven_v4_turbo": 1.0, "eleven_v3": 1.0, "eleven_v3_conversational": 0.5, "eleven_multilingual_v2": 1.0, "eleven_flash_v2_5": 0.5,
         "eleven_turbo_v2_5": 0.5}
 TARGET_LUFS = -19.0  # voice level before the final -14 LUFS master (music sits at -17.4 and is ducked)
 MAX_PAUSE = 0.42  # s, fallback cap for silences inside a scene
@@ -175,7 +175,7 @@ def el_quota():
 
 
 def el_settings(model, stability):
-    if model.startswith("eleven_v3"):
+    if model.startswith(("eleven_v3", "eleven_v4")):
         vs = {"stability": stability, "similarity_boost": 0.8}
         if model == "eleven_v3_conversational":
             vs["use_speaker_boost"] = True
@@ -669,7 +669,7 @@ def build(args):
     tl = cfg.get("lang", cut)  # text language: a variant cut can read another cut's text with its own voice
     if backend != "none":
         reexec_with(["numpy"])
-    voice, model, stability = args.voice or cfg.get("voice"), args.model or cfg.get("model", "eleven_v3"), cfg.get("stability", 0.5)
+    voice, model, stability = args.voice or cfg.get("voice"), args.model or cfg.get("model", "eleven_v4"), cfg.get("stability", 0.5)
     seeds = [int(x) for x in args.seeds.split(",")] if args.seeds else cfg.get("seeds", DEFAULT_SEEDS)[: args.takes]
     defaults = script.get("defaults", {})
     only = set(args.scene.split(",")) if args.scene else None
@@ -853,7 +853,7 @@ def main():
     a.add_argument("--lang", default="en")
     a.add_argument("--backend", choices=["elevenlabs", "edge"])
     a.add_argument("--voices", required=True, help="name=voice_id,... (edge: name=en-US-AndrewNeural,...)")
-    a.add_argument("--model", default="eleven_v3", help="comma-separated ElevenLabs models")
+    a.add_argument("--model", default="eleven_v4", help="comma-separated ElevenLabs models")
     a.add_argument("--stability", type=float, default=0.5)
     a.add_argument("--seed", type=int, default=7)
     a.add_argument("--rate", default="+0%", help="edge speaking rate, e.g. +8%%")

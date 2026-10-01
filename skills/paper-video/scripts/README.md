@@ -33,7 +33,7 @@ and are never printed.
   "fps": 30,
   "defaults": { "leadInMs": -200, "tailMs": 600 },   // negative leadInMs = J-cut (voice starts before the picture changes)
   "voices": {                                         // one entry per cut
-    "en": { "backend": "elevenlabs", "voice": "<voice id>", "model": "eleven_v3_conversational",
+    "en": { "backend": "elevenlabs", "voice": "<voice id>", "model": "eleven_v4",
             "stability": 0.5, "seeds": [11, 23, 37], "tempo": 1.0, "pauseScale": 1.0, "f0Max": 420,
             "keyTerms": ["Qwen", "DAPO"] },                // takes whose transcript loses a key term lose the pick
     "zh": { "backend": "edge", "voice": "zh-CN-YunxiNeural", "rate": "+0%", "pitch": "+0Hz" },
