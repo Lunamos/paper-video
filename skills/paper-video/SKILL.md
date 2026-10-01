@@ -13,7 +13,8 @@ Supporting material (read when you reach that stage):
 - `reference/rigor.md` — claims ledger, data handling, independent fact-check
 - `reference/voice.md` — narration backends (ElevenLabs / free edge-tts / the user's own recording / none), QA, pronunciation
 - `reference/visual-style.md` — design system, motion rules, data honesty, review loop
-- `reference/platforms.md` — YouTube + Bilibili deliverables: specs, covers, titles, descriptions, chapters, vertical cut
+- `reference/platforms.md` — YouTube + Bilibili deliverables: specs, covers, titles, descriptions, chapters
+- `reference/vertical.md` — the 9:16 phone cut: safe area, type sizes, one focus per beat, hook, building it from the same audio
 - `reference/handoff.md` — using the user's own materials, and exporting for editing software
 - `reference/third-party.md` — starting from only an arXiv link/title: finding source, code and data; extracting numbers from LaTeX/figures; small CPU illustrations; faithfulness when the paper is not the user's
 - `scripts/` — the pipeline (see `scripts/README.md`); `template/` — the Remotion starter (see `template/README.md`)
@@ -70,7 +71,7 @@ Music (optional, `scripts/music.py` or a user-supplied royalty-free track) ducke
 
 ## 9. Deliverables and handoff
 
-Per `reference/platforms.md`: horizontal cuts per language, optional vertical cut, covers (16:9 and vertical), SRTs, and `out/social_copy.md` with titles/descriptions/chapters per platform (plus any other platform the user asks for — research its current conventions then). If the user wants to finish in an editor or bring their own footage, follow `reference/handoff.md`.
+Per `reference/platforms.md`: horizontal cuts per language, optional vertical cut (native 9:16 layouts, `reference/vertical.md`), covers (16:9 and vertical), SRTs, and `out/social_copy.md` with titles/descriptions/chapters per platform (plus any other platform the user asks for — research its current conventions then). If the user wants to finish in an editor or bring their own footage, follow `reference/handoff.md`.
 
 ## Running on a headless machine
 Everything works without a display or GPU: Remotion renders with headless Chrome (downloaded on first use; on Linux it needs the usual shared libraries — `npx remotion browser ensure` reports what is missing), the Python/ffmpeg tools are CLI-only, faster-whisper runs on CPU. Preview by rendering stills/MP4s, or run `npx remotion studio` and forward the port (`ssh -L 3000:localhost:3000 host`). Install Node (nvm), `uv` and a static ffmpeg in the user's home directory if there is no root.

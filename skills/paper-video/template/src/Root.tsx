@@ -1,5 +1,5 @@
 import { Composition, Folder, Still } from "remotion";
-import { Cover, CoverV } from "./Cover";
+import { Cover, CoverBili, CoverV } from "./Cover";
 import { SCENES } from "./scenes/registry";
 import { calcVerticalMetadata, VerticalVideo } from "./Vertical";
 import { calcSceneMetadata, calcVideoMetadata, MainVideo, ScenePreview, VideoProps } from "./Video";
@@ -60,6 +60,8 @@ export const RemotionRoot: React.FC = () => {
       <Folder name="Covers">
         <Still id="Cover-EN" component={Cover} width={1920} height={1080} defaultProps={{ lang: "en" as const }} />
         <Still id="Cover-ZH" component={Cover} width={1920} height={1080} defaultProps={{ lang: "zh" as const }} />
+        <Still id="Cover-Bili" component={CoverBili} width={1920} height={1080} defaultProps={{ lang: "zh" as const }} />
+        <Still id="Cover-Bili-Guides" component={CoverBili} width={1920} height={1080} defaultProps={{ lang: "zh" as const, guides: true }} />
         <Still id="Cover-ZH-3x4" component={CoverV} width={1080} height={1440} defaultProps={{ lang: "zh" as const }} />
         <Still id="Cover-ZH-9x16" component={CoverV} width={1080} height={1920} defaultProps={{ lang: "zh" as const }} />
         <Still id="Cover-EN-3x4" component={CoverV} width={1080} height={1440} defaultProps={{ lang: "en" as const }} />

@@ -118,6 +118,58 @@ export const Cover: React.FC<{ lang?: Lang; hero?: React.ReactNode }> = ({ lang 
   );
 };
 
+/**
+ * Bilibili cover: ONE uploaded image is shown as 16:9 on the video page and the user's space and cropped to 4:3 for the
+ * home feed. Everything readable is centred inside the middle 4:3 area (x 240–1680 at 1920 wide); the hero runs as a
+ * band across the full width, so the 16:9 view is not empty at the sides. Render with --scale=2 (3840×2160) and check
+ * both crops (`guides` draws the 4:3 borders).
+ */
+export const CoverBili: React.FC<{ lang?: Lang; hero?: React.ReactNode; guides?: boolean }> = ({ lang = "zh", hero, guides = false }) => {
+  useFontsReady();
+  const T = COVER[lang];
+  const zh = lang === "zh";
+  const { width: W, height: H } = useVideoConfig();
+  const x0 = W * 0.125;
+  const x1 = W * 0.875;
+  return (
+    <AbsoluteFill style={{ background: color.bg }}>
+      <Backdrop glowAt="50% 70%" width={W} height={H} />
+      <div style={{ position: "absolute", left: 0, top: H * 0.62, width: W, height: H * 0.32 }}>{hero ?? <CoverHero w={W} h={H * 0.32} />}</div>
+      <AbsoluteFill style={{ background: "linear-gradient(180deg, rgba(11,14,19,0.95) 0%, rgba(11,14,19,0.85) 52%, rgba(11,14,19,0) 66%)" }} />
+      <div style={{ position: "absolute", left: x0, width: x1 - x0, top: H * 0.08, textAlign: "center" }}>
+        <div style={{ fontFamily: font.mono, fontSize: 34, letterSpacing: "0.16em", color: color.text2 }}>{T.kicker}</div>
+        <div
+          style={{
+            marginTop: 22,
+            fontFamily: zh ? font.sans : font.serif,
+            fontWeight: zh ? 900 : 600,
+            fontSize: zh ? 140 : 120,
+            lineHeight: 1.06,
+            color: color.text,
+            letterSpacing: zh ? "0.02em" : "-0.02em",
+          }}
+        >
+          {T.lines.map(([w, hot]) => (
+            <HotLine key={w} text={w} hot={hot} />
+          ))}
+        </div>
+        <div style={{ marginTop: 28 }}>
+          <CoverPill pill={T.pill} size={44} />
+        </div>
+      </div>
+      <div style={{ position: "absolute", left: x0, width: x1 - x0, top: H * 0.955, textAlign: "center", fontFamily: font.mono, fontSize: 22, color: color.text3 }}>
+        {T.foot}
+      </div>
+      {guides ? (
+        <>
+          <div style={{ position: "absolute", left: x0, top: 0, width: 2, height: H, background: "#ff00ff" }} />
+          <div style={{ position: "absolute", left: x1, top: 0, width: 2, height: H, background: "#ff00ff" }} />
+        </>
+      ) : null}
+    </AbsoluteFill>
+  );
+};
+
 /** Vertical covers: 3:4 (1080×1440) and 9:16 (1080×1920); layout adapts to the composition height. */
 export const CoverV: React.FC<{ lang?: Lang; hero?: React.ReactNode }> = ({ lang = "zh", hero }) => {
   useFontsReady();

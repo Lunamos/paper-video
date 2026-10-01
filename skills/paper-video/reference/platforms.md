@@ -11,10 +11,11 @@ Built in: **YouTube** and **Bilibili**. For any other platform the user names (X
 | Captions | burned in + `.srt` for CC (optional) | burned in; `.srt` as CC only if not burned in |
 | Vertical | Shorts: 1080×1920, ≤ 60 s — make a short teaser if wanted | 竖屏: 1080×1920, full length OK |
 
-Vertical cut (`template` Vertical composition): title block and current chapter on top, the 16:9 film re-rendered in the middle (not a downscaled video — it stays sharp), chapter progress bar, larger captions below, bottom ~20% and the right edge left free for the platform's buttons.
+Vertical cut: build it **natively for the phone** (`reference/vertical.md`): same audio, new 9:16 layouts with very big type and one focus per beat, inside the platforms' safe area. The template's `Vertical` composition (the 16:9 film re-rendered in a band between a title block and captions) is only a quick draft — its text is too small on a phone.
 
 ## Covers
-- 16:9 1920×1080 (YouTube, Bilibili); Bilibili also shows 16:10/4:3 crops — keep the text inside a centred safe area, nothing important in the bottom-right corner (duration badge).
+- YouTube: 16:9 1920×1080 (under 2 MB).
+- **Bilibili takes ONE cover image** but shows it twice: cropped to **4:3 in the home feed** and as **16:9 on the video page and the user's space**. Make one 16:9 master (`Cover-Bili`, rendered with `--scale=2` → 3840×2160, exported as JPEG ~1 MB) with every readable element and the key visual inside the centred 4:3 area (x 240–1680 of 1920) and only background extension in the side bands; check both crops (`ffmpeg -i cover_bilibili.png -vf crop=iw*0.75:ih cover_bilibili_preview_4x3.jpg`) and tell the user to keep the uploader's 4:3 crop centred. Nothing important in the bottom-right corner (duration badge). Don't hand over separate 16:9 / 16:10 / 4:3 files for Bilibili — only one can be uploaded.
 - Vertical covers: 3:4 1080×1440 and 9:16 1080×1920.
 - One strong visual from the film (real data), a 2–6 word headline about the finding (not about the tool), one small pill with the key number or claim. High contrast, readable as a thumbnail.
 - The headline obeys the same truth rules as the script: if the result holds only for some settings (e.g. on par for the small model, better for the large ones), say "same or better", not "better", and let the pill name the setting of the number.
