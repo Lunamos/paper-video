@@ -1,4 +1,4 @@
-"""Shared helpers for the paper-video scripts (stdlib only).
+"""Shared helpers for the paper2video scripts (stdlib only).
 
 - project root discovery (the folder holding scenes.json)
 - API keys: read from the environment or the project's .env, never printed

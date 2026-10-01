@@ -1,4 +1,4 @@
-# paper-video
+# paper2video
 
 A Claude Code skill that turns a research paper or project into a polished explainer / promo video, in the style of 3Blue1Brown, built with [Remotion](https://www.remotion.dev).
 
@@ -61,7 +61,7 @@ Or manually:
 
 ```bash
 git clone https://github.com/Lunamos/paper-video
-cp -r paper-video/skills/paper-video ~/.claude/skills/
+cp -r paper-video/skills/paper2video ~/.claude/skills/
 ```
 
 You don't need to set up Remotion yourself. The skill tells Claude to:
@@ -78,7 +78,7 @@ You only need Node.js 18+, ffmpeg and Python 3.10+ on the machine.
 ## Use
 
 ```
-Use the paper-video skill to make an explainer video for https://github.com/<you>/<repo>
+Use the paper2video skill to make an explainer video for https://github.com/<you>/<repo>
 (paper: https://arxiv.org/abs/xxxx.xxxxx). English for YouTube and Chinese for Bilibili,
 third person, keep it under 4 minutes.
 ```
@@ -90,7 +90,7 @@ To collaborate, drop logos, screen recordings, photos, a music track or your own
 ## What's inside
 
 ```
-skills/paper-video/
+skills/paper2video/
   SKILL.md              the workflow: intake → understanding → script → data → voice → scenes → fact-check → render → deliverables
   reference/            rigor, voice, visual style, platforms (YouTube + Bilibili), third-party papers from an
                         arXiv link (finding data, digitising figures, CPU illustrations), materials & editor handoff

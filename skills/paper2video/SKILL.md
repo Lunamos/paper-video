@@ -1,9 +1,9 @@
 ---
-name: paper-video
+name: paper2video
 description: Turn a research paper or project (just an arXiv link or a paper title is enough; or a repo, PDF, project page, or working directory) into a polished, 3Blue1Brown-style explainer / promo video built with Remotion — script, voice-over (optional TTS key; free or self-recorded alternatives), real-data animations, captions, music, bilingual cuts, vertical cut, covers, and platform copy for YouTube and Bilibili. Use when the user asks for a paper video, project video, research promo, explainer video, 论文宣传片 / 论文讲解视频, or wants to publish a video about their work.
 ---
 
-# paper-video
+# paper2video
 
 Make a video that a stranger with no context can follow, that stays true to the work, and that looks good enough to share: real data on screen early, one idea per beat, smooth motion that explains rather than decorates.
 

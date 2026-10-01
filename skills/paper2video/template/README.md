@@ -1,4 +1,4 @@
-# paper-video template
+# paper2video template
 
 A Remotion 4 (React 19, TypeScript) starter for 3Blue1Brown-style research explainers: dark backdrop, equation-driven,
 fixed semantic colours, stroke-drawn reveals, word-timed voice-over with captions, a vertical cut and covers.
