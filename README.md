@@ -92,7 +92,8 @@ To collaborate, drop logos, screen recordings, photos, a music track or your own
 ```
 skills/paper-video/
   SKILL.md              the workflow: intake → understanding → script → data → voice → scenes → fact-check → render → deliverables
-  reference/            rigor, voice, visual style, platforms (YouTube + Bilibili), materials & editor handoff
+  reference/            rigor, voice, visual style, platforms (YouTube + Bilibili), third-party papers from an
+                        arXiv link (finding data, digitising figures, CPU illustrations), materials & editor handoff
   scripts/              voice-over pipeline (ElevenLabs / edge-tts / recorded / none) with ASR QA, music, SFX,
                         captions, mastering, vertical cut, handoff export, contact sheets
   template/             Remotion starter: theme, captions, anchor-driven timeline, scene shell, vertical layout, covers

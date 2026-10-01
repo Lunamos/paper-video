@@ -1,6 +1,6 @@
 ---
 name: paper-video
-description: Turn a research paper or project (a repo, a paper PDF/arXiv link, a project page, or a working directory) into a polished, 3Blue1Brown-style explainer / promo video built with Remotion — script, voice-over (optional TTS key; free or self-recorded alternatives), real-data animations, captions, music, bilingual cuts, vertical cut, covers, and platform copy for YouTube and Bilibili. Use when the user asks for a paper video, project video, research promo, explainer video, 论文宣传片 / 论文讲解视频, or wants to publish a video about their work.
+description: Turn a research paper or project (just an arXiv link or a paper title is enough; or a repo, PDF, project page, or working directory) into a polished, 3Blue1Brown-style explainer / promo video built with Remotion — script, voice-over (optional TTS key; free or self-recorded alternatives), real-data animations, captions, music, bilingual cuts, vertical cut, covers, and platform copy for YouTube and Bilibili. Use when the user asks for a paper video, project video, research promo, explainer video, 论文宣传片 / 论文讲解视频, or wants to publish a video about their work.
 ---
 
 # paper-video
@@ -15,11 +15,12 @@ Supporting material (read when you reach that stage):
 - `reference/visual-style.md` — design system, motion rules, data honesty, review loop
 - `reference/platforms.md` — YouTube + Bilibili deliverables: specs, covers, titles, descriptions, chapters, vertical cut
 - `reference/handoff.md` — using the user's own materials, and exporting for editing software
+- `reference/third-party.md` — starting from only an arXiv link/title: finding source, code and data; extracting numbers from LaTeX/figures; small CPU illustrations; faithfulness when the paper is not the user's
 - `scripts/` — the pipeline (see `scripts/README.md`); `template/` — the Remotion starter (see `template/README.md`)
 
 ## 0. Intake (keep it short)
 
-You need: **access to the work** (repo URL or path, paper PDF/arXiv link, project page, or remote machine the user can let you read), **languages** (default: English; add Chinese for Bilibili), **target platforms** (default: YouTube + Bilibili), and **narration** (see `reference/voice.md`; default: ElevenLabs if a key is available in env/.env, otherwise edge-tts, and say so). Ask only what you cannot default. Also ask once: first person ("our paper") or third person ("this paper"), and anything that must not appear (unpublished side projects, anonymous submissions, private data).
+You need: **the work** — an arXiv link or a paper title is enough (then follow `reference/third-party.md` to find source, code and data yourself); a repo, path, project page or readable remote machine also works. **Whose work**: the user's own (first person allowed) or someone else's (third person, faithful, credited — `reference/third-party.md`). **Languages and platforms** (default: an English cut for YouTube and a Chinese cut for Bilibili, both 16:9, plus covers in several sizes and titles/descriptions/chapters for both),  and **narration** (see `reference/voice.md`; default: ElevenLabs if a key is available in env/.env, otherwise edge-tts, and say so). Ask only what you cannot default. Also ask once: first person ("our paper") or third person ("this paper"), and anything that must not appear (unpublished side projects, anonymous submissions, private data).
 
 Treat every remote/shared resource as **read-only** unless told otherwise; list files and sizes before pulling anything large (ask above ~500 MB); never print or commit keys.
 
@@ -32,7 +33,7 @@ Treat every remote/shared resource as **read-only** unless told otherwise; list 
 
 ## 2. Understand the work before writing a word
 
-Read the paper end to end (and appendix), the README / project page, and skim the code for what the figures are made from. Find the **core finding and why it is surprising**, the 2–4 claims that carry the story, and the visuals that can show them with *real* data (figure-data exports, result JSONs, logged metrics, demo outputs). Prefer exported figure data or raw results over digitising plots. Write `notes/understanding.md`: the one-sentence story, the claims with their numbers and settings, the candidate visuals, and anything confusing or easy to overstate.
+Collect the material first (`reference/third-party.md` §1–2 if you only have a link or title). Read the paper end to end (and appendix), the README / project page, and skim the code for what the figures are made from. Find the **core finding and why it is surprising**, the 2–4 claims that carry the story, and the visuals that can show them with *real* data (figure-data exports, result JSONs, logged metrics, demo outputs). Prefer exported figure data or raw results over digitising plots. Write `notes/understanding.md`: the one-sentence story, the claims with their numbers and settings, the candidate visuals, and anything confusing or easy to overstate.
 
 ## 3. Story, script and claims
 
@@ -66,6 +67,9 @@ Music (optional, `scripts/music.py` or a user-supplied royalty-free track) ducke
 ## 9. Deliverables and handoff
 
 Per `reference/platforms.md`: horizontal cuts per language, optional vertical cut, covers (16:9 and vertical), SRTs, and `out/social_copy.md` with titles/descriptions/chapters per platform (plus any other platform the user asks for — research its current conventions then). If the user wants to finish in an editor or bring their own footage, follow `reference/handoff.md`.
+
+## Running on a headless machine
+Everything works without a display or GPU: Remotion renders with headless Chrome (downloaded on first use; on Linux it needs the usual shared libraries — `npx remotion browser ensure` reports what is missing), the Python/ffmpeg tools are CLI-only, faster-whisper runs on CPU. Preview by rendering stills/MP4s, or run `npx remotion studio` and forward the port (`ssh -L 3000:localhost:3000 host`). Install Node (nvm), `uv` and a static ffmpeg in the user's home directory if there is no root.
 
 ## Iterating with the user
 
