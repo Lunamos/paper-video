@@ -66,3 +66,16 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   anchor with `python3 scripts/vreview.py [--scenes …]` (contact sheets per scene) → fix → render with
   `scripts/finalize.sh <PREFIX>-V-ZH <name>_zh_vertical` → check the first and last frames match (loop) and sample a
   frame every 5–6 s of the final file to see the pacing.
+
+## Fact-check the vertical cut too
+New headlines, labels and layouts are new claims: run an independent screen fact-check on the vertical scenes (and the
+vertical copy) before uploading. What it found on three cuts:
+- a headline stronger than the voice-over or the paper (「多是这些词」 for "such as …", 「循环也没用」 for "add little");
+- a dropped scene that carried context the remaining ones need (the default setting was only said in the dropped
+  scene) — and copy that still described a dropped scene;
+- an animated counter paired with the wrong result (loop 4 shown next to the result after loop 3);
+- an illustration's hero number whose "not the paper's model" label was only in the small source line — put a chip
+  next to the number;
+- bars of different widths (area overstates a ratio); a source line running under the button column;
+- an end card saying 「见简介」 for things the description did not contain.
+Small print over a bright picture needs a dark plate, not just a halo.
