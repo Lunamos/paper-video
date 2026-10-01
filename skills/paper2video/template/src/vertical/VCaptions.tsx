@@ -95,7 +95,13 @@ export const VCaptions: React.FC<{ timeline: Timeline; zh?: boolean }> = ({ time
     const out: Page[] = [];
     for (const s of timeline.scenes) {
       for (const l of s.lines) {
-        const abs = l.words.map((w) => ({ ...w, from: w.from + s.from, to: w.to + s.from }));
+        // a timed "word" can hold a list ("wait、however、suppose"): split it after 、/，/, into pieces with the same
+        // timing, so a caption line may break inside the list instead of shrinking the whole page
+        const abs = l.words.flatMap((w) =>
+          w.w
+            .split(/(?<=[、，])(?=.)|(?<=,)(?=\D)/u) // not inside numbers like 65,537
+            .map((piece, k) => ({ ...w, w: piece, sp: k === 0 ? w.sp : false, from: w.from + s.from, to: w.to + s.from })),
+        );
         for (const pg of paginate(abs, zh, `${s.id}:${l.id}`)) {
           const flat = pg.flat();
           out.push({ from: flat[0].from, to: flat[flat.length - 1].to, lines: pg });

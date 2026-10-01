@@ -23,6 +23,8 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   line, broken between words, Chinese punctuation replaced by spaces. For Chinese, precompute word boundaries with jieba
   (a small script over the caption words of `vo.zh.json` → a JSON table of allowed break offsets per line): the
   renderer's `Intl.Segmenter` splits e.g. 金门大桥 as 金门|大|桥, which puts 「桥」 alone on the next caption page.
+  A timed "word" that holds a list (「wait、however、suppose」) is split after 、/，/, into pieces with the same timing,
+  so the caption can break inside the list instead of shrinking the whole page (numbers like 65,537 stay whole).
 - The only small text: the source line (≈ 26 px) and honesty chips (≈ 34 px) — rigor survives the format change.
 - At most three elements at once (focus, one label or headline, the caption), one thing moving at a time.
 - Charts: ≤ 4–5 bars or ≤ 3 lines, 2–4 ticks, direct labels instead of legends, no grid, ours highlighted, bars from
