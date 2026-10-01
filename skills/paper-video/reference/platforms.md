@@ -22,6 +22,22 @@ Vertical cut: build it **natively for the phone** (`reference/vertical.md`): sam
 - YouTube thumbnails must be under 2 MB: a 1920×1080 PNG with a busy backdrop often is not — export a JPEG (quality ~90) next to it.
 
 ## Titles, descriptions, chapters (`out/social_copy.md`)
+Use the structure of `template/social_copy.example.md` — the same sections in the same order every time, so the user
+can paste each block straight into the upload form:
+- **Header**: paper, authors, links, the files to upload (with durations), the cover file, the stance (first/third person, what is illustration).
+- **Per platform**: cover note → 3–5 titles (★ recommended) → description → chapters → (Bilibili) pinned comment → tags → category / AI declaration.
+- **Description shape**: 1–2 lines of hook (the surprising finding in plain words — this is what shows before "more" /
+  in the feed) → one sentence on whose paper and what it does → 2–4 short bullets, each one finding with its number
+  and setting → links (identifiers only on Bilibili) → authors → one line of stance and credits → third-party asset
+  credits last, compact (author · licence; full URLs only where the licence needs them). Short paragraphs; no walls of
+  text; settings in brackets only where a number needs them; what the video does not cover goes in at most one
+  short "also in the paper" bullet, or nowhere.
+- **Chapters**: computed from the final timeline (`scripts/timeline_info.py`), floor to whole seconds, first at 0:00,
+  ≥ 3, each ≥ 10 s (merge a short outro into the previous chapter); YouTube: in the description right after the
+  links; Bilibili: a separate block for the 分段章节 field.
+- **Limits**: YouTube title ≤ 100 chars (aim ≤ 70), description ≤ 5,000; Bilibili title ≤ 80, 简介 ≤ 2,000 字, ≤ 10 tags.
+- Chinese: a space between Chinese and Latin letters / numbers, full-width punctuation, 「」 for quotes.
+
 - Lead with the concrete surprising thing, in the audience's words; the paper title belongs in the description. Offer 3–5 title options per platform. YouTube ≤ 100 chars (aim ≤ 70); Bilibili ≤ 80 chars.
 - Descriptions: a hook paragraph, 2–4 lines of what the work found (numbers with settings), links, authors, a line of credits.
 - **Links**: YouTube and X: real links. Bilibili (and 小红书): external links are not clickable and can hurt reach — write plain identifiers ("arXiv 2601.01234", "GitHub: owner/repo") instead of URLs.

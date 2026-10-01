@@ -4,14 +4,20 @@ A 16:9 film shrunk into a 9:16 frame is shown at 0.56×: a 48 px label becomes ~
 the screen is busy and half empty. Build the vertical cut **natively**: the same voice-over, music and SFX, new scene
 layouts for the phone. Viewers asked for: very big text, very few things on screen, one focus at a time.
 
-## Safe area (1080×1920)
-Measured from the official overlays (YouTube Shorts, Reels, TikTok) and what 抖音 / B 站竖屏 show:
-- everything readable inside **x 120–888, y 288–1248**; below y 840 keep the right edge **≤ 780** (button column);
-- captions may reach y ≈ 1300 (visible when the post text is short); the bottom ~600 px are background only;
-- check a frame against the platforms' overlay images when in doubt.
+## Safe area for text, the whole frame for the picture (1080×1920)
+- **Text** (anything a viewer must read) stays in the text-safe area, measured from the official overlays (YouTube
+  Shorts, Reels, TikTok) and what 抖音 / B 站竖屏 show: x 120–888, y ≈ 260–1500; below y 840 keep text at x ≤ 780
+  (button column). Captions sit at 68–78 % of the height (y ≈ 1300–1500), where popular Chinese and English
+  explainers put them.
+- **The picture uses the whole frame.** Visuals may run under the platform UI and should bleed into the top (0–260)
+  and bottom (1500–1920) bands. Do not confine the picture to the text-safe box: a design that leaves the top and
+  bottom empty looks like a square video on a phone (user feedback on a first attempt).
+- Check a frame against the platforms' overlay images when in doubt.
 
 ## Layout and type
-- Stack: headline / keyword (y 300–600) → **one** focal visual (y 600–1060) → captions (y ~1090–1290).
+- Stack: headline / keyword (y ≈ 280–620) → **one** main visual, **tall** and full-width (y ≈ 620–1280, bleeding
+  beyond) → captions (y ≈ 1300–1500). Compose vertically: stacks, columns, towers, horizontal bars stacked down the
+  screen, big objects that run off the frame edges — not a 16:9 chart shrunk into the middle.
 - Sizes at 1080 wide: headline 100–140 px bold; key phrase 72–96 px; hero number 180–260 px; labels ≥ 44 px (never
   < 36); captions 60–72 px bold with a dark stroke, ≤ 2 lines, ≈ 9–10 Chinese characters or ≈ 18 Latin characters per
   line, broken between words (Chinese: `Intl.Segmenter`), Chinese punctuation replaced by spaces.
