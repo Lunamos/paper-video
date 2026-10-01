@@ -1,16 +1,17 @@
 {
   "version": 2,
   "fps": 30,
-  "notes": "Script source of truth. Per scene and language: lines with text (captions), tts (what is spoken: respellings, sparse audio tags), anchors (name -> EN: first word containing it; ZH: substring), optional pauseAfterMs. Line ids mean the same thing in every language. The voice-over pipeline turns this into public/data/vo.<cut>.json.",
+  "notes": "Script source of truth. Per scene and language: lines with text (captions), tts (what is spoken: respellings, sparse audio tags), anchors (name -> EN: first word containing it; ZH: substring), optional pauseAfterMs. Line ids mean the same thing in every language. Per scene: chapter (video chapter), musicSection (groups scenes into music sections; defaults to chapter), musicStyles. The voice-over pipeline turns this into public/data/vo.<cut>.json.",
   "defaults": {
     "leadInMs": -200,
     "tailMs": 650
   },
   "_voices_doc": {
-    "elevenlabs": "voice (voice id), voiceName, model, stability, seeds (takes per scene; best one auto-picked), tempo (atempo), maxPause (s), pauseScale",
+    "elevenlabs": "voice (voice id), voiceName, model, stability, seeds (takes per scene; best one auto-picked), tempo (atempo), maxPause (s), pauseScale, f0Max, keyTerms (names/terms a take must not lose; spellings joined by |)",
     "edge": "voice (an edge-tts voice name), rate (e.g. '+0%'), pitch (e.g. '+0Hz'); free, no key",
-    "recorded": "dir (folder with one file per scene: <scene id>.<format>), format; word timings come from ASR",
-    "none": "no audio; timings are estimated from wpm (EN) / cps (ZH) so picture and captions can be built first"
+    "recorded": "the user's narration in recordings/<cut>/<scene id>.(wav|mp3|m4a|flac); whisperModel (default 'small'), tighten (default false); word timings come from ASR",
+    "none": "no audio; timings are estimated from cps (latin chars/s, default 15) / cpsCjk (CJK chars/s, default 5) so picture and captions can be built first",
+    "lang": "any cut may set lang to read another cut's text blocks with its own voice (e.g. a draft or variant cut)"
   },
   "voices": {
     "en": {
@@ -22,7 +23,8 @@
       "seeds": [11, 23, 37],
       "tempo": 1.0,
       "maxPause": 0.28,
-      "pauseScale": 1.0
+      "pauseScale": 1.0,
+      "keyTerms": ["<model name>", "<core term>"]
     },
     "zh": {
       "backend": "edge",
@@ -33,21 +35,21 @@
     },
     "en-draft": {
       "backend": "none",
-      "text": "en",
-      "wpm": 165
+      "lang": "en",
+      "cps": 15
     }
   },
   "music": {
-    "backend": "elevenlabs",
-    "globalStyles": ["minimal ambient electronic", "warm analog synth pads", "gentle felt piano", "curious, clean modern science explainer", "instrumental"],
-    "negativeStyles": ["vocals", "heavy drums", "EDM drop", "cinematic trailer hits", "busy melody that competes with narration"],
-    "targetLufs": -17.4,
-    "endRingOutMs": 1500
+    "positive": ["minimal ambient electronic", "warm analog synth pads", "gentle felt piano", "curious, clean modern science explainer", "instrumental"],
+    "negative": ["vocals", "heavy drums", "EDM drop", "cinematic trailer hits", "busy melody that competes with narration"],
+    "cutStyles": { "zh": [] },
+    "seed": 7
   },
   "scenes": [
     {
       "id": "s_intro",
       "chapter": "Intro",
+      "musicSection": "opening",
       "musicStyles": ["sparse and curious", "soft synth swell", "sense of discovery"],
       "en": {
         "minSeconds": 8,
@@ -79,6 +81,7 @@
     {
       "id": "s_example",
       "chapter": "The formula",
+      "musicSection": "main",
       "musicStyles": ["light and explanatory", "steady soft pulse", "gentle arpeggio"],
       "en": {
         "minSeconds": 12,

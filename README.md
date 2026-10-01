@@ -95,7 +95,8 @@ skills/paper-video/
   reference/            rigor, voice, visual style, platforms (YouTube + Bilibili), third-party papers from an
                         arXiv link (finding data, digitising figures, CPU illustrations), materials & editor handoff
   scripts/              voice-over pipeline (ElevenLabs / edge-tts / recorded / none) with ASR QA, music, SFX,
-                        captions, mastering, vertical cut, handoff export, contact sheets
+                        captions, mastering, vertical cut, handoff export, contact sheets, figure-data
+                        extraction (vector PDFs, colormaps, digitising), final-file checks
   template/             Remotion starter: theme, captions, anchor-driven timeline, scene shell, vertical layout, covers
 ```
 

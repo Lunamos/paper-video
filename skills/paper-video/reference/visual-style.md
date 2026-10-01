@@ -10,7 +10,7 @@ Reference point: 3Blue1Brown — dark background, few colours with fixed meaning
 
 ## Motion rules
 - Only `useCurrentFrame()` + `interpolate`/`spring` (no CSS transitions); seeded randomness only.
-- Key every beat to a voice-over anchor, with a fallback frame.
+- Key every beat to a voice-over anchor, with a fallback frame. Word order differs between languages (a Chinese sentence may name the affiliations before the venue): when a reveal belongs to a whole sentence, start it at that line's first word (`useLine(id).from`; SFX cue `at: "line:<id>"`) instead of an anchor word that sits early in one language and late in the other. When two anchors can come in either order, start the beat at whichever comes first.
 - Reveal with stroke-draw, wipe, fade-and-rise; one new thing at a time.
 - Numbers appear at their final value (no count-ups: intermediate frames would show numbers that are not in the paper). Bars grow from zero; log axes are labelled.
 - Emphasis goes on the element (outline, glow, a hand-drawn loop, a short pulse), **never on the whole frame** — no full-frame punch-ins, shakes or zooms. Gentle camera moves inside a single diagram (a pan across a heatmap, an orbit around a 3D plot) are fine when they serve the explanation.
@@ -26,5 +26,5 @@ Reference point: 3Blue1Brown — dark background, few colours with fixed meaning
 - 2.5D perspective via CSS 3D transforms or a small projection helper is usually enough; reach for WebGL (`@remotion/three`) only for genuinely 3D or very dense scenes (text in WebGL is worse, renders are slower).
 
 ## Review loop
-- Render stills in every language at anchor-based frames (a few per scene), tile them into contact sheets, and actually look. Check: overlaps, clipping, text too small, empty or half-built frames at the moments the voice talks about them, captions colliding with source lines, layout breaking with longer translations.
+- Render stills in every language at anchor-based frames (a few per scene), tile them into contact sheets (`scripts/review.py`), and actually look. Check: overlaps, clipping, text too small, empty or half-built frames at the moments the voice talks about them, captions colliding with source lines, layout breaking with longer translations.
 - When the user reports a problem at a timestamp, map it to the scene and anchor (`scripts/timeline_info.py`), extract the real frames from the rendered MP4 (not just stills) and compare consecutive frames if it is about motion or jitter.

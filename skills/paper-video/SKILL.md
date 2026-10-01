@@ -52,17 +52,17 @@ Build the narration before animating (`reference/voice.md`): `scripts/vo.py buil
 
 ## 6. Build the scenes
 
-- You build the theme, shared components and anything reused across scenes first (see `reference/visual-style.md`); then scenes can be parallelised across subagents with **explicit file ownership** (one scene set per agent, nobody edits shared files — they report requested changes back to you). Give each agent: `CLAUDE.md`, the storyboard entry, the `scenes.json` lines and anchor names, the data files, the style rules, and the requirement to render and inspect stills in every language before reporting.
+- You build the theme, shared components and anything reused across scenes first (see `reference/visual-style.md`); then scenes can be parallelised across subagents with **explicit file ownership** (one scene set per agent, nobody edits shared files — they report requested changes back to you). Give each agent: `CLAUDE.md`, the storyboard entry, the `scenes.json` lines and anchor names, the data files, the style rules, the chapter number and title for each of its scenes (parallel agents otherwise number their chapter tags independently), and the requirement to render and inspect stills in every language before reporting (`scripts/review.py`). Afterwards re-run `scripts/zh_font_subset.py` once: new Chinese characters fall back to a system font until then.
 - Every scene: headline, beats driven by anchors (with fallbacks), a source line on data shots, SCHEMATIC on illustrations, both languages' on-screen strings, content clear of the caption band.
-- Review: render stills at anchor-based frames for the whole film in every language, tile them into contact sheets (`scripts/contact_sheet.py`), and look — overlaps, clipping, empty frames, illegible text, anything off-message. Iterate.
+- Review: render stills at anchor-based frames for the whole film in every language and tile them into contact sheets (`scripts/review.py <Composition> <cut> [--scenes ...]`, one bundle for all frames), and look — overlaps, clipping, empty frames, illegible text, anything off-message. Iterate.
 
 ## 7. Independent fact-check
 
-Spawn a fresh agent that did not build anything to check the script and every on-screen string/number against the paper (prompt in `reference/rigor.md`). Fix MUST-FIX items (including voice-over wording, then regenerate those scenes) and most SHOULD-FIX items.
+Spawn a fresh agent that did not build anything to check the script and every on-screen string/number against the paper (prompt in `reference/rigor.md`). Two passes work well: the script and copy as soon as the voice-over exists (in parallel with scene building, when wording fixes are cheapest), then the screens (strings, plotted data, covers) from the review sheets. Fix MUST-FIX items (including voice-over wording, then regenerate those scenes and `music.py --refit`) and most SHOULD-FIX items.
 
 ## 8. Sound, render, verify
 
-Music (optional, `scripts/music.py` or a user-supplied royalty-free track) ducked under speech; a few procedural SFX on visual beats (`scripts/sfx_synth.py`, cues in `src/timeline/sfx.ts`; subtle, ≤2 "hits" per film). Render and master with `scripts/finalize.sh` (−14 LUFS / −1.5 dBTP), export captions with `scripts/srt.py`. Verify the files: duration, streams, loudness, a full-mix ASR pass against the script, and a frame-difference check on held shots (no jitter). Report honestly what was checked.
+Music (optional, `scripts/music.py` or a user-supplied royalty-free track) ducked under speech; a few procedural SFX on visual beats (`scripts/sfx_synth.py`, cues in `src/timeline/sfx.ts`; subtle, ≤2 "hits" per film). Render and master with `scripts/finalize.sh` (−14 LUFS / −1.5 dBTP), export captions with `scripts/srt.py`. Verify every file with `scripts/verify.py <mp4> --cut <lang>`: streams, duration against the timeline, loudness, a full-mix ASR pass against the script (with the key terms), and full-frame motion runs (zoom/drift/jitter) to look at. Report honestly what was checked.
 
 ## 9. Deliverables and handoff
 

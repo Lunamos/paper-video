@@ -6,6 +6,8 @@
 // Example:
 //   { scene: "s_example", at: "result", offset: 0, sfx: "pop", vol: 0.06 }          // on the anchor word "result"
 //   { scene: "s_example", at: 45, sfx: "tick1", vol: 0.05 }                          // 45 frames into the scene
+//   { scene: "s_example", at: "line:c", offset: 6, sfx: "hit", vol: 0.1 }            // just after line c starts (a reveal tied
+//                                                                                    // to a sentence, not a word: same in every language)
 //   { scene: "s_example", at: "chart", sfx: "whoosh", vol: 0.08, cut: "en" }         // only in the EN voice cut
 //   WHOOSH_INTO = ["s_results"]  -> a whoosh peaking on the cut into that scene
 //   MUSIC_DROPOUTS = [["s_results", "result", 18, 2]] -> the music dips from 18 frames before to 2 after that word
@@ -14,7 +16,7 @@ import type { Timeline } from "./timeline";
 export type SfxName = "whoosh" | "pop" | "tick1" | "tick2" | "tick3" | "hit" | "stamp" | "shimmer" | "powerdown";
 export type Cue = {
   scene: string; // scene id
-  at: string | number; // anchor name, or a frame number relative to the scene start
+  at: string | number; // anchor name, "line:<id>" (that line's first word), or a frame number relative to the scene start
   offset?: number; // frames added to the resolved position
   sfx: SfxName; // file: public/audio/sfx/<sfx>.wav
   vol: number; // linear volume, typically 0.04–0.14
@@ -39,6 +41,10 @@ export const resolveCues = (tl: Timeline, cut: string): ResolvedCue[] => {
     const s = tl.scenes.find((x) => x.id === sceneId);
     if (!s) return null;
     if (typeof at === "number") return s.from + at;
+    if (at.startsWith("line:")) {
+      const l = s.lines.find((x) => x.id === at.slice(5));
+      return l ? s.from + l.from : null;
+    }
     for (const l of s.lines) if (at in l.anchors) return s.from + l.anchors[at];
     return null;
   };

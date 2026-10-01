@@ -19,6 +19,7 @@ Audition 3–4 candidate voices per language with two or three representative se
 ## Generation strategy that sounds alive
 - **One request per scene**, not per sentence — sentence-by-sentence synthesis sounds stiff and starts every sentence cold.
 - **Several seeds per scene** (e.g. 3); pick automatically by ASR accuracy first, then prosody (pitch variation) with a small penalty for length. Manual picks go in `notes/vo_picks.<lang>.json`. For a scene that must stay calm, set `"pick": "steady"` (closest to the film's typical expressiveness).
+- **Key terms**: list the words whose misreading changes the meaning — model and method names, the paper's core term — as `"keyTerms"` on a voice (all scenes) or a scene block, with accepted spellings separated by `|` (`["Qwen|千问", "熵|商"]`). A take whose transcript loses one loses the pick, whatever its overall error rate: a single wrong syllable (千问 → 千万) barely moves the error rate but is exactly what a viewer hears. Lost terms are printed as `LOST-TERMS` in the build log.
 - **Sparse audio tags** (≈4 per language per film). A tag at the very start of a scene can slur the first word — put the tag later or drop it.
 - **Tighten pauses by context** (clause < line break < sentence end < ellipsis) and enforce minimum gaps after lines that need air (`pauseAfterMs`). Normalise loudness per clip; the master is normalised again at the end.
 - **J-cuts**: a negative `leadInMs` lets the next scene's voice start slightly before its picture.
@@ -30,7 +31,9 @@ Pronunciation tricks (only change `tts`, never the caption `text`):
 - respell names and acronyms phonetically, test variants with ASR, keep the one that round-trips;
 - spell numbers as words the way you want them read ("twenty-twenty-six", "zero point six"; in Chinese write the characters);
 - **polyphones** (e.g. Chinese 行 háng/xíng, 调 diào/tiáo, 长 cháng/zhǎng): rewrite with an unambiguous homophone in `tts` or rephrase;
-- a word misheard in all takes is usually mispronounced — rephrase with a synonym.
+- **rare characters**: a TTS voice may not know a rare technical character (e.g. 熵 shāng, "entropy") and guess another reading; write a common character with the same sound in `tts` only (熵 → 商) and confirm with ASR that the transcript shows the intended word again (ASR picks the character from context, so a correct read comes back as 熵). Respell it in every scene, not only where it failed: a scene that happened to read it right can misread it the next time it is regenerated;
+- a word misheard in all takes is usually mispronounced — rephrase with a synonym;
+- an error that appears in only one take is that take's problem: pick another seed rather than rewriting the line.
 
 ## Cost, caching, keys
 Every paid batch: query remaining quota, estimate the batch, print both, abort if it would exceed. Audio is cached by a hash of text + voice + model + settings + seed, so re-runs only pay for what changed. Keys live only in env/`.env` (git-ignored); never print them.

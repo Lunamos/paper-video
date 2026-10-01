@@ -8,16 +8,22 @@ Optional. Two ways:
 Either way the result is public/audio/bgm_<cut>.mp3 at -17.4 LUFS (linear gain, no dynamics
 processing); the video ducks it under the voice.
 
-Chapters come from scenes.json: a scene may carry "chapter": "<name>" (scenes without one join the
-previous chapter) and "musicStyles": [...] (merged into that chapter's local styles). Global styles:
+Chapters come from scenes.json: a scene may carry "musicSection" (or, if absent, "chapter"): "<name>" (scenes
+without one join the previous section) and "musicStyles": [...] (merged into that chapter's local styles). Global styles:
   "music": {"positive": [...], "negative": [...], "cutStyles": {"<cut>": [...]}, "seed": 7,
             "creditsPerSecond": 14}
 Section lengths come from public/data/vo.<cut>.json (same maths as src/timeline/timeline.ts), so
 build the voice-over first. The quota is queried before the request and the run aborts if the
 estimate exceeds it. Keys are never printed.
 
+After a voice-over change, `--refit` re-times the composition already generated for this cut (cached audio +
+notes/music_plan.<cut>.json) to the new section lengths: each section is cut out and time-stretched on its own
+(a few percent is inaudible for ambient music) - no new request, no credits. If sections were added or renamed, or a
+section changes by more than --max-stretch, it stops and you regenerate instead.
+
 Usage:
   python3 scripts/music.py --lang en [--dry-run]
+  python3 scripts/music.py --lang en --refit [--max-stretch 0.12]
   python3 scripts/music.py --lang en --file ~/Music/some_cc0_track.mp3
 """
 from __future__ import annotations
@@ -67,7 +73,8 @@ def chapters(script, cut, fps):
     out = []
     for s, _, d in scene_spans(load_vo(cut), fps):
         sc = info.get(s["id"], {})
-        name = sc.get("chapter") or (out[-1]["name"] if out else s["id"])
+        # "musicSection" groups scenes into music sections independently of the (finer) video chapters
+        name = sc.get("musicSection") or sc.get("chapter") or (out[-1]["name"] if out else s["id"])
         if not out or out[-1]["name"] != name:
             out.append({"name": name, "ms": 0, "styles": []})
         out[-1]["ms"] += round(d / fps * 1000)
@@ -99,11 +106,49 @@ def level(src, dst, total_s=None):
     print(f"[level] gain {gain:+.2f} dB -> {TARGET_LUFS} LUFS  {dst.relative_to(ROOT)}")
 
 
+def refit(script, cut, fps, dst, max_stretch):
+    """Time-stretch each section of the cached composition to the current section lengths (no API call)."""
+    plan_path = ROOT / "notes" / f"music_plan.{cut}.json"
+    if not plan_path.exists():
+        sys.exit(f"{plan_path.relative_to(ROOT)} missing: generate the music first")
+    comp = json.loads(plan_path.read_text())
+    seed = script.get("music", {}).get("seed", 7)
+    src = CACHE / f"{hashlib.sha256(json.dumps([comp, seed], sort_keys=True).encode()).hexdigest()[:20]}.mp3"
+    if not src.exists():
+        sys.exit(f"cached composition {src.name} not found (music settings changed?): regenerate instead")
+    old = [x["duration_ms"] / 1000 for x in comp["sections"]]
+    new_secs = chapters(script, cut, fps)
+    if [x["section_name"] for x in comp["sections"]] != [c["name"] for c in new_secs]:
+        sys.exit("music sections were added, removed or renamed: regenerate with music.py instead")
+    new = [c["ms"] / 1000 for c in new_secs]
+    k = dur_s(src) / sum(old)  # the generated audio is a little longer/shorter than planned: scale the cut points
+    bounds = [0.0]
+    for o in old:
+        bounds.append(bounds[-1] + o * k)
+    parts, fade = [], 0.015
+    for i, (a0, a1, n) in enumerate(zip(bounds, bounds[1:], new)):
+        tempo = (a1 - a0) / n
+        print(f"  {comp['sections'][i]['section_name']:24} {a1 - a0:6.2f}s -> {n:6.2f}s  (tempo {tempo:.3f})")
+        if abs(tempo - 1) > max_stretch:
+            sys.exit(f"section changes by more than {max_stretch:.0%}: regenerate with music.py instead")
+        parts.append(f"[0:a]atrim=start={a0:.4f}:end={a1:.4f},asetpts=PTS-STARTPTS,atempo={tempo:.5f},"
+                     f"afade=t=in:d={fade},afade=t=out:st={max(0.0, n - fade):.4f}:d={fade}[s{i}]")
+    graph = ";".join(parts) + ";" + "".join(f"[s{i}]" for i in range(len(new))) + f"concat=n={len(new)}:v=0:a=1[out]"
+    tmp = dst.with_suffix(".refit.wav")
+    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(src), "-filter_complex", graph,
+                    "-map", "[out]", "-ar", "44100", "-ac", "2", str(tmp)], check=True)
+    level(tmp, dst)
+    tmp.unlink()
+    print(f"[refit] {dur_s(dst):.1f}s for a {sum(new):.1f}s timeline (no credits used)")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--lang", default="en", help="cut id (reads public/data/vo.<cut>.json)")
     ap.add_argument("--file", help="use this royalty-free track instead of generating one")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--refit", action="store_true", help="re-time the cached composition to the current timeline")
+    ap.add_argument("--max-stretch", type=float, default=0.12)
     a = ap.parse_args()
     script, fps = load_script(), project_fps()
     dst = ROOT / "public" / "audio" / f"bgm_{a.lang}.mp3"
@@ -111,6 +156,9 @@ def main():
     total_s = sum(d for _, _, d in scene_spans(load_vo(a.lang), fps)) / fps + RING_OUT_S
     if a.file:
         level(pathlib.Path(a.file).expanduser(), dst, total_s)
+        return
+    if a.refit:
+        refit(script, a.lang, fps, dst, a.max_stretch)
         return
     if not env_key("ELEVENLABS_API_KEY", required=False):
         print("No ELEVENLABS_API_KEY: music generation skipped (the video works without music).\n"

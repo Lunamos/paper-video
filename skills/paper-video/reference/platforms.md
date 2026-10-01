@@ -17,6 +17,8 @@ Vertical cut (`template` Vertical composition): title block and current chapter 
 - 16:9 1920×1080 (YouTube, Bilibili); Bilibili also shows 16:10/4:3 crops — keep the text inside a centred safe area, nothing important in the bottom-right corner (duration badge).
 - Vertical covers: 3:4 1080×1440 and 9:16 1080×1920.
 - One strong visual from the film (real data), a 2–6 word headline about the finding (not about the tool), one small pill with the key number or claim. High contrast, readable as a thumbnail.
+- The headline obeys the same truth rules as the script: if the result holds only for some settings (e.g. on par for the small model, better for the large ones), say "same or better", not "better", and let the pill name the setting of the number.
+- YouTube thumbnails must be under 2 MB: a 1920×1080 PNG with a busy backdrop often is not — export a JPEG (quality ~90) next to it.
 
 ## Titles, descriptions, chapters (`out/social_copy.md`)
 - Lead with the concrete surprising thing, in the audience's words; the paper title belongs in the description. Offer 3–5 title options per platform. YouTube ≤ 100 chars (aim ≤ 70); Bilibili ≤ 80 chars.

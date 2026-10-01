@@ -597,14 +597,34 @@ def steady_reference(cut, exclude, current=()):
     return vals[len(vals) // 2] if vals else 4.5
 
 
+def missing_terms(take, terms, spoken):
+    """Key terms (names, the paper's core term) the ASR transcript lost: a misread like Qwen -> "queen" or
+    千问 -> 千万 changes the meaning while barely moving the overall error rate. A term lists its accepted
+    spellings separated by "|" ("Qwen|千问", or "熵|商" when tts respells a rare character); the number of
+    occurrences in the spoken text (tts) is compared with the transcript."""
+    asr = take["qa"].get("asr")
+    if asr is None or not terms:
+        return []
+    asr, spoken = asr.lower(), spoken.lower()
+    out = []
+    for term in terms:
+        alts = [a.lower() for a in term.split("|") if a]
+        want = sum(spoken.count(a) for a in alts)
+        if want and sum(asr.count(a) for a in alts) < want:
+            out.append(term.split("|")[0])
+    return out
+
+
 def pick(takes, block, cut, scene_id, report, manual):
-    """Manual pick wins. Else: accurate first (ASR error within 0.02 of the best take), then
+    """Manual pick wins. Else: fewest lost key terms, then accurate (ASR error within 0.02 of the best take), then
     expressive but not slow (one extra second must buy >= 0.8 semitones of pitch variation).
     `"pick": "steady"`: the take closest to the cut's typical expressiveness instead."""
     if manual is not None and any(t["seed"] == manual for t in takes):
         return next(t for t in takes if t["seed"] == manual)
     if len(takes) == 1:
         return takes[0]
+    m0 = min(len(t.get("missing", [])) for t in takes)
+    takes = [t for t in takes if len(t.get("missing", [])) == m0]
     e0 = min(t["qa"].get("err", 0) for t in takes)
     ok = [t for t in takes if t["qa"].get("err", 0) <= e0 + 0.02]
     d0 = min(t["durationMs"] for t in ok)
@@ -685,6 +705,7 @@ def build(args):
         block = sc[tl]
         lines = prepare_lines(block, strip)
         text = " ".join(l["say"] for l in lines)
+        terms = cfg.get("keyTerms", []) + block.get("keyTerms", [])
         takes = []
         if backend == "none":
             times, dms = reading_times(lines, cfg)
@@ -705,13 +726,15 @@ def build(args):
             final, lj, dms = process_take(sc["id"], lines, text, times, audio, wd, cfg, tighten)
             engine = "scribe" if backend == "elevenlabs" else ("whisper" if args.asr and asr_result is None else None)
             q = qa_take(key, audio, text, tl, cfg.get("f0Max", 420.0), engine, asr_result)
-            takes.append({"seed": seed, "final": final, "lines": lj, "durationMs": dms, "qa": q, "fresh": fresh})
+            takes.append({"seed": seed, "final": final, "lines": lj, "durationMs": dms, "qa": q, "fresh": fresh,
+                          "missing": missing_terms({"qa": q}, terms, strip_tags(text))})
         best = pick(takes, {"pick": block.get("pick", sc.get("pick"))}, cut, sc["id"], report, picks.get(sc["id"]))
         for t in takes:
             q = t["qa"]
             print(f" {'*' if t is best else ' '} {sc['id']:16} seed={str(t['seed']):<4} {t['durationMs'] / 1000:5.1f}s "
                   f"err={q.get('err', '-')} f0std={q.get('f0StdSt', '-')} range={q.get('f0Range90St', '-')} "
-                  f"events={q.get('events', [])} {'silent' if backend == 'none' else 'new' if t['fresh'] else 'cached'}")
+                  f"events={q.get('events', [])} {'silent' if backend == 'none' else 'new' if t['fresh'] else 'cached'}"
+                  + (f" LOST-TERMS={t['missing']}" if t.get("missing") else ""))
             for d in q.get("diffs", [])[:4]:
                 print(f"      {d}")
         if best["final"]:
@@ -724,7 +747,7 @@ def build(args):
                           "tailMs": block.get("tailMs", sc.get("tailMs", defaults.get("tailMs", 350))),
                           "lines": best["lines"]}
         report.append({"scene": sc["id"], "picked": best["seed"],
-                       "takes": [{k: v for k, v in t.items() if k in ("seed", "durationMs", "qa")} for t in takes]})
+                       "takes": [{k: v for k, v in t.items() if k in ("seed", "durationMs", "qa", "missing")} for t in takes]})
     order = [s["id"] for s in script["scenes"] if tl in s]
     vo = {"version": 2, "meta": {"lang": cut, "textLang": tl, "backend": backend, "voice": voice, "model": model if backend == "elevenlabs" else None,
                                  "tempo": cfg.get("tempo", 1.0), "generated": dt.datetime.now().isoformat(timespec="seconds")},
