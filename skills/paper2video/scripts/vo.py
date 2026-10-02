@@ -898,6 +898,12 @@ def build(args):
                  f"remaining_before={remaining} remaining_after={remaining2}")
         print(f"[quota] remaining {remaining2} (spent {remaining - remaining2} so far; the counter often lags — keep the books with the estimate above)")
     missing = [i for i in order if i not in keep]
+    # scenes kept from an earlier build (--scene) carry that build's caption text: flag edits made since
+    script_text = {(s["id"], l["id"]): l["text"] for s in script["scenes"] if tl in s for l in s[tl]["lines"]}
+    stale = [f"{s['id']}.{l['id']}" for s in vo["scenes"] for l in s["lines"] if script_text.get((s["id"], l["id"]), l["text"]) != l["text"]]
+    if stale:
+        print(f"[stale] caption text changed in scenes.json but not in this timeline: {', '.join(stale)} — "
+              f"run a full build (cached takes, free; pin picks in notes/vo_picks.{cut}.json to keep the same audio)")
     print(f"[done] {vo_path.relative_to(ROOT)} total≈{vo['meta']['estimatedTotalMs'] / 1000:.1f}s"
           + (f"  (not built yet: {', '.join(missing)})" if missing else ""))
 
