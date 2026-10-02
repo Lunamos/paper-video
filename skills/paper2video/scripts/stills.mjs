@@ -5,7 +5,7 @@
 // Writes <outDir>/<CompositionId>_<frame>[_<label>].png and prints the paths (one per line).
 // Typical use: python3 scripts/review.py builds the frame list from the anchors and tiles a contact sheet.
 // Cleans up after itself: the bundle (a copy of the project incl. public/, often 50+ MB, written to $TMPDIR) is deleted
-// and the headless browser closed on success, error or Ctrl-C. (An earlier version left one bundle per run: 30+ GB.)
+// and the headless browser closed on success, error or Ctrl-C; each run uses its own temp folder, so runs can overlap. (An earlier version left one bundle per run: 30+ GB.)
 import { bundle } from "@remotion/bundler";
 import { openBrowser, renderStill, selectComposition } from "@remotion/renderer";
 import fs from "node:fs";
@@ -36,15 +36,16 @@ const items = (framesArg.startsWith("@") ? fs.readFileSync(framesArg.slice(1), "
 fs.mkdirSync(outDir, { recursive: true });
 let serveUrl = null;
 let browser = null;
-// Remotion's temp dirs (bundle, downloaded assets) that appear while this script runs are removed at the end.
-const tmp = os.tmpdir();
-const ours = (n) => n.startsWith("remotion-");
-const before = new Set(fs.readdirSync(tmp).filter(ours));
+// Remotion's temp dirs (bundle, downloaded assets) go into a private folder for this run, removed at the end. Private, so
+// that two runs at once (two agents, or a render next to a review) never delete each other's bundle — sweeping the shared
+// temp dir for new "remotion-*" folders did exactly that and showed up as random 404 / ENOENT errors in the other run.
+const runTmp = fs.mkdtempSync(path.join(os.tmpdir(), "stills-"));
+process.env.TMPDIR = runTmp;
 const removeTemp = () => {
   // synchronous on purpose: on Ctrl-C the renderer's own handler may exit the process before async work finishes
   if (serveUrl) fs.rmSync(serveUrl, { recursive: true, force: true });
   serveUrl = null;
-  for (const n of fs.readdirSync(tmp).filter(ours)) if (!before.has(n)) fs.rmSync(path.join(tmp, n), { recursive: true, force: true });
+  fs.rmSync(runTmp, { recursive: true, force: true });
 };
 const cleanup = async () => {
   removeTemp();

@@ -46,12 +46,14 @@ import base64
 import datetime as dt
 import difflib
 import hashlib
+import http.client
 import json
 import pathlib
 import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -366,6 +368,15 @@ def gs_request(cfg, text, lang, seed) -> dict:
             "seed": seed if seed is not None else -1, "media_type": "wav", "streaming_mode": False}
 
 
+def asr_engine(cfg, backend, asr_flag):
+    """Which ASR checks a take. ElevenLabs: Scribe (bills the same account) only when the voice asks for it with
+    "asrEngine": "scribe"; by default the free local faster-whisper. "asrEngine": "none" skips the check."""
+    e = cfg.get("asrEngine")
+    if e:
+        return None if e == "none" else e
+    return "whisper" if backend == "elevenlabs" or asr_flag else None
+
+
 def gs_synth(text, cfg, lang, seed):
     """One GPT-SoVITS take (cached) + local faster-whisper words for timing and QA.
     Returns (key, wav, per-char times, fresh, asr_result)."""
@@ -378,7 +389,7 @@ def gs_synth(text, cfg, lang, seed):
     if fresh:
         url = gs_ensure(cfg)
         body = json.dumps(req, ensure_ascii=False).encode()
-        for attempt in (1, 2):
+        for attempt in (1, 2, 3):
             try:
                 r = urllib.request.Request(f"{url}/tts", data=body, headers={"Content-Type": "application/json"})
                 with urllib.request.urlopen(r, timeout=max(120, len(text) * 2)) as f:
@@ -386,10 +397,11 @@ def gs_synth(text, cfg, lang, seed):
                 break
             except urllib.error.HTTPError as e:
                 sys.exit(f"GPT-SoVITS HTTP {e.code}: {e.read()[:400].decode(errors='replace')}")
-            except (urllib.error.URLError, OSError):
-                if attempt == 2:
+            except (urllib.error.URLError, OSError, http.client.HTTPException):  # incl. IncompleteRead
+                if attempt == 3:
                     raise
-                url = gs_ensure(cfg)  # e.g. a borrowed tunnel went away
+                time.sleep(5 * attempt)
+                url = gs_ensure(cfg)  # e.g. a borrowed tunnel went away mid-response
         if data[:4] != b"RIFF":
             sys.exit(f"GPT-SoVITS returned no WAV: {data[:200]!r}")
         d.mkdir(parents=True, exist_ok=True)
@@ -858,7 +870,7 @@ def build(args):
             wd = work / f"{sc['id']}_{seed if seed is not None else backend}"
             wd.mkdir(exist_ok=True)
             final, lj, dms = process_take(sc["id"], lines, text, times, audio, wd, cfg, tighten)
-            engine = "scribe" if backend == "elevenlabs" else ("whisper" if args.asr and asr_result is None else None)
+            engine = asr_engine(cfg, backend, args.asr and asr_result is None)
             q = qa_take(key, audio, text, tl, cfg.get("f0Max", 420.0), engine, asr_result)
             takes.append({"seed": seed, "final": final, "lines": lj, "durationMs": dms, "qa": q, "fresh": fresh,
                           "missing": missing_terms({"qa": q}, terms, strip_tags(text))})
@@ -944,7 +956,7 @@ def audition(args):
                 key, mp3, _, _ = edge_synth(text, {"voice": v, "rate": args.rate}, args.lang)
             dst = outdir / f"{args.lang}_{name}_{m.replace('eleven_', '')}.mp3"
             shutil.copyfile(mp3, dst)
-            engine = "scribe" if backend == "elevenlabs" else ("whisper" if args.asr else None)
+            engine = asr_engine({}, backend, args.asr)
             q = qa_take(key, mp3, text, args.lang, args.f0max, engine)
             print(f"  {name:12} {m:26} {q['durationS']:5.1f}s f0med={q.get('f0MedianHz')} f0std={q.get('f0StdSt')} "
                   f"range={q.get('f0Range90St')} loudStd={q.get('loudStdDb')} pauses={q['pauses']} max={q['pauseMaxS']} "

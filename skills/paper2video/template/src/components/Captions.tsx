@@ -2,6 +2,25 @@ import React, { useMemo } from "react";
 import { useCurrentFrame } from "remotion";
 import { color, font, layout, type } from "../theme";
 import type { Timeline, TimedWord } from "../timeline/timeline";
+import zhBreaks from "../../public/data/zh_breaks.json";
+
+// Chinese: break inside a clause only between words (jieba boundaries from scripts/zh_breaks.py, keyed "<scene>:<line>",
+// as offsets in characters); without a table every word boundary is allowed.
+const breaksOf = (ws: TimedWord[], key: string): Set<number> => {
+  const table = (zhBreaks as unknown as Record<string, number[]>)[key];
+  const ok = new Set<number>();
+  if (!table) {
+    for (let i = 1; i < ws.length; i++) ok.add(i);
+    return ok;
+  }
+  const allowed = new Set(table);
+  let off = 0;
+  ws.forEach((w, i) => {
+    if (i > 0 && (allowed.has(off) || w.sp || /^[A-Za-z0-9]/.test(w.w) !== /[A-Za-z0-9]$/.test(ws[i - 1].w))) ok.add(i);
+    off += w.w.length;
+  });
+  return ok;
+};
 
 type Page = { from: number; to: number; words: TimedWord[] };
 
@@ -17,7 +36,9 @@ const tokenLen = (w: TimedWord, zh: boolean) => {
 
 // Break a line's words into pages: split into clauses at punctuation, pack whole clauses into pages up to the
 // limit, and only split inside a clause when the clause alone is too long (then as evenly as possible).
-const paginate = (words: TimedWord[], zh: boolean): TimedWord[][] => {
+const paginate = (words: TimedWord[], zh: boolean, key = ""): TimedWord[][] => {
+  const ok = zh ? breaksOf(words, key) : null;
+  const idx = new Map(words.map((w, i) => [w, i]));
   const len = (ws: TimedWord[]) => ws.reduce((a, w) => a + tokenLen(w, zh), 0);
   const limit = zh ? MAX_ZH : MAX_EN;
   if (len(words) <= limit) return [words];
@@ -41,7 +62,7 @@ const paginate = (words: TimedWord[], zh: boolean): TimedWord[][] => {
     const target = len(c) / n;
     let part: TimedWord[] = [];
     for (const w of c) {
-      if (part.length && len(part) + tokenLen(w, zh) > target + (zh ? 1 : 4) && pieces.length < 999) {
+      if (part.length && len(part) + tokenLen(w, zh) > target + (zh ? 1 : 4) && (!ok || ok.has(idx.get(w) ?? 0))) {
         pieces.push(part);
         part = [];
       }
@@ -85,7 +106,7 @@ export const Captions: React.FC<{ timeline: Timeline; fontFamily?: string; zh?: 
     for (const s of timeline.scenes) {
       for (const l of s.lines) {
         const abs = l.words.map((w) => ({ ...w, from: w.from + s.from, to: w.to + s.from }));
-        for (const pg of paginate(abs, zh)) {
+        for (const pg of paginate(abs, zh, `${s.id}:${l.id}`)) {
           out.push({ from: pg[0].from, to: pg[pg.length - 1].to, words: pg });
         }
       }

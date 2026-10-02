@@ -45,7 +45,7 @@ for s in vo["scenes"]:
     comp = f"V-{names[s['id']]}"
     lst = out / f"{comp}.txt"
     lst.write_text("\n".join(f"{fr} {lab}" for fr, lab in sorted(pts.items())))
-    r = subprocess.run(["node", str(HERE / "stills.mjs"), comp, str(out / comp), f"@{lst}", "--scale", str(a.scale)],
+    r = subprocess.run(["node", str(HERE / "stills.mjs"), comp, str(out / comp), f"@{lst}", "--scale", str(a.scale), "--props", json.dumps({"lang": a.cut})],
                        cwd=ROOT, capture_output=True, text=True)
     if r.returncode:
         sys.exit(r.stderr[-2000:])

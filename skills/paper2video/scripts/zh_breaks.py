@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Word boundaries for the Chinese captions of the vertical cut: public/data/zh_breaks.json = {"<scene>:<line>":
+"""Word boundaries for the Chinese captions (16:9 and vertical cut): public/data/zh_breaks.json = {"<scene>:<line>":
 [character offsets where a caption line may break]}, computed with jieba on the caption words of
 public/data/vo.zh.json (joined without spaces, exactly as src/vertical/VCaptions.tsx joins them). The renderer's
 Intl.Segmenter splits e.g. 金门大桥 as 金门|大|桥, which strands 「桥」 on the next caption page.

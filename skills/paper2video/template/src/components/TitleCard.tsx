@@ -19,6 +19,10 @@ export type TitleCardProps = {
   hot?: string; // accent colour of the title
   serif?: boolean;
   titleSize?: number;
+  authorsSize?: number;
+  claimSize?: number;
+  top?: number; // y of the block (default 22% of the height, 330 px vertical)
+  // titleSize / authorsSize / claimSize: shrink for a long title or author list (check the 9:16 card clears the captions)
 };
 
 export const TitleCard: React.FC<TitleCardProps> = ({
@@ -34,6 +38,9 @@ export const TitleCard: React.FC<TitleCardProps> = ({
   hot = color.text,
   serif = true,
   titleSize,
+  authorsSize,
+  claimSize,
+  top,
 }) => {
   const f = useCurrentFrame();
   const { width: W, height: H } = useVideoConfig();
@@ -54,7 +61,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({
         </AbsoluteFill>
       ) : null}
       <AbsoluteFill style={{ background: "radial-gradient(ellipse 80% 70% at 40% 45%, rgba(11,14,19,0.35), rgba(11,14,19,0.9))" }} />
-      <div style={{ position: "absolute", left, width, top: vertical ? 330 : H * 0.22 }}>
+      <div style={{ position: "absolute", left, width, top: top ?? (vertical ? 330 : H * 0.22) }}>
         {kicker ? (
           <div style={{ fontFamily: font.mono, fontSize: vertical ? 30 : 24, letterSpacing: "0.16em", textTransform: "uppercase", color: color.text2, ...appear(pK) }}>
             {kicker}
@@ -81,11 +88,11 @@ export const TitleCard: React.FC<TitleCardProps> = ({
           </div>
         ) : null}
         <div style={{ marginTop: vertical ? 70 : 54, ...appear(pA) }}>
-          <div style={{ fontFamily: font.sans, fontWeight: 600, fontSize: vertical ? 62 : 44, color: color.text }}>{authors}</div>
+          <div style={{ fontFamily: font.sans, fontWeight: 600, fontSize: authorsSize ?? (vertical ? 62 : 44), lineHeight: 1.35, color: color.text }}>{authors}</div>
           {affiliation ? <div style={{ marginTop: 10, fontFamily: font.sans, fontSize: vertical ? 52 : 34, color: color.accent }}>{affiliation}</div> : null}
         </div>
         {claim ? (
-          <div style={{ marginTop: vertical ? 70 : 50, fontFamily: font.sans, fontSize: vertical ? 64 : 40, lineHeight: 1.35, color: color.text, ...appear(pC) }}>{claim}</div>
+          <div style={{ marginTop: vertical ? 70 : 50, fontFamily: font.sans, fontSize: claimSize ?? (vertical ? 64 : 40), lineHeight: 1.35, color: color.text, ...appear(pC) }}>{claim}</div>
         ) : null}
         {note ? (
           <div style={{ marginTop: vertical ? 50 : 36, fontFamily: font.mono, fontSize: vertical ? 30 : 19, letterSpacing: "0.12em", textTransform: "uppercase", color: color.text3, opacity: pA }}>

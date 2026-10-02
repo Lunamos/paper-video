@@ -18,7 +18,7 @@ and are never printed.
 | `zh_font_subset.py` | Local CJK font subset of exactly the characters used -> `public/fonts/zh/`, `src/theme/fonts-zh.json` | no | `python3 scripts/zh_font_subset.py` |
 | `review.py` | Review stills: every anchor (once its beat has settled) plus scene starts/ends, rendered with one bundle (`stills.mjs`) and tiled into contact sheets per scene or for the film | no | `python3 scripts/review.py VIDEO-ZH zh --scenes s_method` |
 | `vreview.py` | Contact sheets of the vertical scenes (`V-<Name>` previews) at every anchor, one sheet per scene | no | `python3 scripts/vreview.py --scenes s_intro,s_end` |
-| `zh_breaks.py` | Chinese word boundaries (jieba) for the vertical captions → `public/data/zh_breaks.json`; re-run after each Chinese voice build | no | `uv run --with jieba python scripts/zh_breaks.py` |
+| `zh_breaks.py` | Chinese word boundaries (jieba) for the captions (16:9 and vertical) → `public/data/zh_breaks.json`; re-run after each Chinese voice build | no | `uv run --with jieba python scripts/zh_breaks.py` |
 | `stills.mjs` | Many stills of one composition from a single bundle (used by `review.py`) | no | `node scripts/stills.mjs VIDEO-EN review/stills 120,480,900 --scale 0.5` |
 | `contact_sheet.py` | Tile rendered stills into one review image | no | `python3 scripts/contact_sheet.py review/sheet.png review/stills/*.png` |
 | `figdata.py` | Numbers from figure files: `dump` (vector PDF paths + labels), `images` (embedded raster panels), `heatmap` (colormap inversion of cells + their text), `markers` (digitise line+marker plots, overlay for checking) | no | `uv run --with pymupdf python scripts/figdata.py dump figs/fig3.pdf` |
