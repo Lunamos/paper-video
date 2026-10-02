@@ -12,6 +12,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+if (process.env.PAPER_VIDEO_TMPDIR) process.env.TMPDIR = process.env.PAPER_VIDEO_TMPDIR; // temp files on the workspace drive
+
 const [comp, outDir, framesArg, ...rest] = process.argv.slice(2);
 if (!comp || !outDir || !framesArg) {
   console.error("usage: node scripts/stills.mjs <CompositionId> <outDir> <frames|@file> [--scale 0.5] [--props JSON]");

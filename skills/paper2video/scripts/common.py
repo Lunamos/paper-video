@@ -18,6 +18,8 @@ import subprocess
 import sys
 
 SCRIPTS = pathlib.Path(__file__).resolve().parent
+if os.environ.get("PAPER_VIDEO_TMPDIR"):  # temp files on the workspace drive (some launchers reset TMPDIR)
+    os.environ["TMPDIR"] = os.environ["PAPER_VIDEO_TMPDIR"]
 
 
 def find_root() -> pathlib.Path:
