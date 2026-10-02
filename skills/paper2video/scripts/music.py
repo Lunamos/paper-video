@@ -24,6 +24,7 @@ section changes by more than --max-stretch, it stops and you regenerate instead.
 Usage:
   python3 scripts/music.py --lang en [--dry-run]
   python3 scripts/music.py --lang en --refit [--max-stretch 0.12]
+  python3 scripts/music.py --lang zh --refit --from en      (reuse the English bed for the Chinese cut, no credits)
   python3 scripts/music.py --lang en --file ~/Music/some_cc0_track.mp3
 """
 from __future__ import annotations
@@ -106,9 +107,11 @@ def level(src, dst, total_s=None):
     print(f"[level] gain {gain:+.2f} dB -> {TARGET_LUFS} LUFS  {dst.relative_to(ROOT)}")
 
 
-def refit(script, cut, fps, dst, max_stretch):
-    """Time-stretch each section of the cached composition to the current section lengths (no API call)."""
-    plan_path = ROOT / "notes" / f"music_plan.{cut}.json"
+def refit(script, cut, fps, dst, max_stretch, src_cut=None):
+    """Time-stretch each section of the cached composition to the current section lengths (no API call).
+    With src_cut (e.g. reuse the English bed for the Chinese cut): sections beyond max_stretch are stretched to the limit
+    and then trimmed (or padded with silence) to length, and sections are joined with short crossfades."""
+    plan_path = ROOT / "notes" / f"music_plan.{src_cut or cut}.json"
     if not plan_path.exists():
         sys.exit(f"{plan_path.relative_to(ROOT)} missing: generate the music first")
     comp = json.loads(plan_path.read_text())
@@ -126,14 +129,30 @@ def refit(script, cut, fps, dst, max_stretch):
     for o in old:
         bounds.append(bounds[-1] + o * k)
     parts, fade = [], 0.015
+    xf = 0.6 if src_cut else 0.0  # crossfade between sections when sections may be trimmed
     for i, (a0, a1, n) in enumerate(zip(bounds, bounds[1:], new)):
         tempo = (a1 - a0) / n
-        print(f"  {comp['sections'][i]['section_name']:24} {a1 - a0:6.2f}s -> {n:6.2f}s  (tempo {tempo:.3f})")
-        if abs(tempo - 1) > max_stretch:
-            sys.exit(f"section changes by more than {max_stretch:.0%}: regenerate with music.py instead")
-        parts.append(f"[0:a]atrim=start={a0:.4f}:end={a1:.4f},asetpts=PTS-STARTPTS,atempo={tempo:.5f},"
-                     f"afade=t=in:d={fade},afade=t=out:st={max(0.0, n - fade):.4f}:d={fade}[s{i}]")
-    graph = ";".join(parts) + ";" + "".join(f"[s{i}]" for i in range(len(new))) + f"concat=n={len(new)}:v=0:a=1[out]"
+        last = i == len(new) - 1
+        target = n + (0 if last else xf)  # each joined section overlaps the next one by xf
+        tempo_t = (a1 - a0) / target
+        if abs(tempo_t - 1) > max_stretch and not src_cut:
+            print(f"  {comp['sections'][i]['section_name']:24} {a1 - a0:6.2f}s -> {n:6.2f}s  (tempo {tempo:.3f})")
+            sys.exit(f"section changes by more than {max_stretch:.0%}: regenerate with music.py instead (or --from another cut)")
+        t = min(max(tempo_t, 1 - max_stretch), 1 + max_stretch)
+        how = "stretch" if t == tempo_t else ("stretch+trim" if tempo_t > t else "stretch+pad")
+        print(f"  {comp['sections'][i]['section_name']:24} {a1 - a0:6.2f}s -> {n:6.2f}s  (tempo {t:.3f}, {how})")
+        fin = fade if i == 0 or not xf else 0.0
+        parts.append(f"[0:a]atrim=start={a0:.4f}:end={a1:.4f},asetpts=PTS-STARTPTS,atempo={t:.5f},apad,atrim=end={target:.4f},"
+                     f"afade=t=in:d={max(fin, fade)},afade=t=out:st={max(0.0, target - max(fade, 0.8 if how != 'stretch' else fade)):.4f}:d={max(fade, 0.8 if how != 'stretch' else fade)}[s{i}]")
+    if xf and len(new) > 1:
+        chain, prev = [], "s0"
+        for i in range(1, len(new)):
+            out = "out" if i == len(new) - 1 else f"x{i}"
+            chain.append(f"[{prev}][s{i}]acrossfade=d={xf}:c1=tri:c2=tri[{out}]")
+            prev = out
+        graph = ";".join(parts) + ";" + ";".join(chain)
+    else:
+        graph = ";".join(parts) + ";" + "".join(f"[s{i}]" for i in range(len(new))) + f"concat=n={len(new)}:v=0:a=1[out]"
     tmp = dst.with_suffix(".refit.wav")
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(src), "-filter_complex", graph,
                     "-map", "[out]", "-ar", "44100", "-ac", "2", str(tmp)], check=True)
@@ -149,6 +168,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--refit", action="store_true", help="re-time the cached composition to the current timeline")
     ap.add_argument("--max-stretch", type=float, default=0.12)
+    ap.add_argument("--from", dest="src_cut", help="with --refit: reuse this cut's generated composition (e.g. --lang zh --refit --from en)")
     a = ap.parse_args()
     script, fps = load_script(), project_fps()
     dst = ROOT / "public" / "audio" / f"bgm_{a.lang}.mp3"
@@ -158,7 +178,7 @@ def main():
         level(pathlib.Path(a.file).expanduser(), dst, total_s)
         return
     if a.refit:
-        refit(script, a.lang, fps, dst, a.max_stretch)
+        refit(script, a.lang, fps, dst, a.max_stretch, a.src_cut)
         return
     if not env_key("ELEVENLABS_API_KEY", required=False):
         print("No ELEVENLABS_API_KEY: music generation skipped (the video works without music).\n"
