@@ -12,6 +12,7 @@ Usage: python3 scripts/srt.py <cut> [--out out/<cut>.srt] [--fps 30]
 from __future__ import annotations
 
 import argparse
+import json
 import pathlib
 import re
 import sys
@@ -116,7 +117,14 @@ def main():
     p.add_argument("--out")
     p.add_argument("--fps", type=int, default=project_fps())
     a = p.parse_args()
-    out = pathlib.Path(a.out) if a.out else ROOT / "out" / f"{a.cut}.srt"
+    if a.out:
+        out = pathlib.Path(a.out)
+    else:  # out/<slug>_<cut>.srt, slug = package.json "name" (the workspace convention); else out/<cut>.srt
+        try:
+            slug = json.loads((ROOT / "package.json").read_text()).get("name", "")
+        except (OSError, ValueError):
+            slug = ""
+        out = ROOT / "out" / (f"{slug}_{a.cut}.srt" if slug and slug != "paper-video" else f"{a.cut}.srt")
     print(f"{write_srt(a.cut, out, a.fps)} cues -> {out}")
 
 

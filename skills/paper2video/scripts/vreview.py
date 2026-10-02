@@ -54,4 +54,7 @@ for s in vo["scenes"]:
     subprocess.run([sys.executable, str(HERE / "contact_sheet.py"), str(sheet), *pngs, "--cols", "6", "--cell", "270x480"],
                    check=True, capture_output=True)
     sheets.append(sheet)
+if not sheets:
+    sys.exit(f"no vertical scene of src/vertical/scenes/registry.ts is in public/data/vo.{a.cut}.json — build the timeline "
+             f"first (python3 scripts/vo.py build --lang {a.cut}; the 'none' backend gives estimated timings for free)")
 print("\n".join(map(str, sheets)))

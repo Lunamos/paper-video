@@ -196,7 +196,8 @@ def main():
         f.write(f"- {dt.datetime.now().isoformat(timespec='seconds')} music cut={a.lang} length={length:.1f}s est={est} "
                 f"remaining_before={rem} remaining_after={rem2}\n")
     (ROOT / "notes" / f"music_plan.{a.lang}.json").write_text(json.dumps(comp, indent=1, ensure_ascii=False))
-    print(f"[done] remaining={rem2} (spent {rem - rem2})")
+    print(f"[done] remaining={rem2} (spent {rem - rem2} so far; the quota API often lags for music — "
+          f"budget with the estimate, ≈{est} credits{' (cached, no new request)' if rem == rem2 and cached.exists() and est else ''})")
 
 
 if __name__ == "__main__":
