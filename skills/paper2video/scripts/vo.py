@@ -787,6 +787,20 @@ def build(args):
     pool = {sc["id"]: (seeds + ([picks[sc["id"]]] if picks.get(sc["id"]) is not None and picks[sc["id"]] not in seeds else []))
             if backend in ("elevenlabs", "gpt-sovits") else [None] for sc in scenes}
     print(f"[batch] cut={cut} text={tl} backend={backend} scenes={len(scenes)} voice={voice or '-'}")
+    # anchors are matched in the caption `text` (not in `tts`): check before any audio is made
+    bad = []
+    for sc in scenes:
+        for l in sc[tl]["lines"]:
+            toks = [key_of(t) for t in re.split(r"\s+", l["text"]) if t]
+            for name, target in (l.get("anchors") or {}).items():
+                ok = target in l["text"] if CJK.search(target) or not target.strip() else any(t.startswith(key_of(target)) for t in toks) or target in l["text"]
+                if not ok:
+                    bad.append(f"{sc['id']}.{l['id']} {name} -> {target!r}")
+    if bad:
+        print("[anchors] not found in the caption text (anchors must be words of `text`, e.g. digits as written there, "
+              "not the `tts` spelling):\n  " + "\n  ".join(bad))
+        if backend == "elevenlabs" and not args.dry_run:
+            sys.exit("fix the anchors first (nothing was generated)")
     remaining = None
     if backend == "elevenlabs":
         if not voice:

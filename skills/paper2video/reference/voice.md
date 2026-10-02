@@ -28,6 +28,8 @@ Audition 3–4 candidate voices per language with two or three representative se
 ## Objective QA (you cannot listen — measure)
 `vo.py` runs `voice_qa.py` on every take: ASR round-trip (ElevenLabs Scribe if a key is present, else faster-whisper) with a diff against the script, pitch statistics, pause statistics. Read the diffs: many are just formatting (numbers written as digits, respelled names); real problems are misread words. Test fixes on short snippets before regenerating whole scenes.
 
+**Anchors are words of the caption `text`, not of `tts`**: with digits in the caption ("85%") and characters in `tts` ("百分之八十五"), the anchor is "85%". `vo.py build` checks this before generating anything.
+
 Pronunciation tricks (only change `tts`, never the caption `text`):
 - respell names and acronyms phonetically, test variants with ASR, keep the one that round-trips;
 - spell numbers as words the way you want them read ("twenty-twenty-six", "zero point six"; in Chinese write the characters);
@@ -70,7 +72,8 @@ Self-hosted voice cloning is free per take and can give a voice no catalogue has
 **Failure modes to watch for:**
 - **Runaway generation.** The model keeps talking, repeats a sentence or invents speech (a 50 s clip for a 15 s text). `vo.py` warns when the audio is much longer than the text and the ASR error exposes it. Change the seed or shorten the chunk.
 - **Hyphens and spelled-out forms** (`R-L-V-R`, `A-I-M-E`) can derail the model completely. Write acronyms plainly.
-- **English inside a non-English voice** is the weak spot of most single-language fine-tunes. Don't respell English words in the other script: viewers find it strange. Keep English to the terms the audience really says in English, and accept a slight accent.
+- **Skipped clauses.** A short clause after a comma can be silently dropped ("预训练靠预测文字，把它们定下来" came out without the second half, in every seed), and the pick-time ASR may not notice. Re-check the picked takes with a stronger model (faster-whisper `large-v3`, decoding the audio with ffmpeg to a numpy array) and compare with the script; fix by rewriting the sentence as one connected clause, not by adding seeds.
+- **English inside a non-English voice** is the weak spot of most single-language fine-tunes. Don't respell English words in the other script: viewers find it strange. Keep English to the terms the audience really says in English, and accept a slight accent. In practice, say it in the voice's language wherever you can and keep the English name on screen: "two researchers at MIT" instead of two English names, "three common post-training methods" instead of PPO/GRPO/ES, a description ("a 100-million-parameter model") instead of a model name.
 - **Rare characters and polyphones** as with any TTS (`熵 → 商` in `tts`), plus key terms in `keyTerms`.
 
 **QA without ears.** Whisper is a rough judge of a stylised voice. `small` misses a lot, so use `medium` or better for picking takes. Whisper forced to Chinese also mangles English words that may sound fine, so listen to (or have the user listen to) the English-heavy lines. Pitch statistics show stability but not "how excited it sounds", so ask the user.
