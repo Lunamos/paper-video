@@ -26,6 +26,7 @@ and are never printed.
 | `finalize_vertical.sh` | Same for a 1080x1920 cut, plus vertical cover stills | no | `scripts/finalize_vertical.sh VIDEO-Vertical video_zh_v Cover-ZH-3x4 Cover-ZH-9x16` |
 | `verify.py` | Check a finished file: streams, duration vs timeline, loudness, full-mix ASR vs script + key terms (local whisper by default), full-frame motion runs (zoom/drift/jitter) -> `notes/verify.<name>.json` | no (optional) | `python3 scripts/verify.py out/video_en.mp4 --cut en` |
 | `export_handoff.py` | For editing apps: silent picture (+ per-scene clips), voice/music/sfx stems, SRT, scene CSV, CMX3600 EDL | no | `python3 scripts/export_handoff.py VIDEO-EN --lang en --per-scene` |
+| `new_video.sh` | Workspace mode: create a video folder from the template + scripts, linked to the workspace's shared `node_modules` and `.env` (copy this script to the workspace root, next to the shared `package.json`) | no | `./new_video.sh "Paper X video"` |
 | `common.py` | Shared helpers (root, keys, loudness, timeline maths, uv runner) | - | imported |
 
 ## scenes.json fields used here
