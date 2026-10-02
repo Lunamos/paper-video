@@ -1,16 +1,26 @@
-# <Paper short title> · 发布文案（B 站 / YouTube）
+# <Paper short title> · 发布文案
 
 - 论文：<full title>（<venue + year, only if the paper says so>）
 - 作者：<all authors>（<institutions>）
 - 链接：arXiv <id> · 代码 <repo> · 项目主页 <url>
-- 文件：`<stem>_zh.mp4`（B 站，m:ss）· `<stem>_en.mp4`（YouTube，m:ss）· 字幕 `<stem>_zh.srt` / `<stem>_en.srt`
 - 口径：<first person for the user's own paper | 第三人称 + 非官方解读>；片中数字来自论文（<what was redrawn / digitised / run for the video>）。
 
 ---
 
-## 1. B 站（`<stem>_zh.mp4`）
+## 文件（都在 `out/`）
 
-**封面**：上传 `cover_bilibili.jpg`（一张图通用：首页 4:3 居中裁切、播放页 16:9；预览见 `cover_bilibili_preview_4x3.jpg` / `_16x9.jpg`）。
+| 用途 | 文件 |
+|---|---|
+| B 站横屏 | `<slug>_zh.mp4`（m:ss）· 字幕 `<slug>_zh.srt` |
+| YouTube | `<slug>_en.mp4`（m:ss）· 字幕 `<slug>_en.srt` |
+| 竖屏 | `<slug>_zh_vertical.mp4`（m:ss） |
+| B 站封面（只传这一张） | `covers/bilibili.jpg`（裁切预览 `covers/bilibili_preview_4x3.jpg` / `_16x9.jpg`） |
+| YouTube 封面 | `covers/youtube.jpg`（< 2 MB） |
+| 竖版封面 | `covers/zh_3x4.jpg` · `covers/zh_9x16.jpg` |
+
+## 1. B 站（`<slug>_zh.mp4`）
+
+**封面**：上传 `covers/bilibili.jpg`（一张图通用：首页 4:3 居中裁切、播放页 16:9；上传时 4:3 裁切框保持居中）。
 
 **标题（任选，★ 推荐）**
 1. ★ <the surprising finding in plain words>｜<venue> 论文解读
@@ -46,9 +56,9 @@
 
 ---
 
-## 2. YouTube (`<stem>_en.mp4`)
+## 2. YouTube (`<slug>_en.mp4`)
 
-**Thumbnail**: `cover_en.jpg` (< 2 MB)
+**Thumbnail**: `covers/youtube.jpg` (< 2 MB)
 
 **Title (pick one, ★ = recommended)**
 1. ★ <finding in plain words> | <paper short title> Explained

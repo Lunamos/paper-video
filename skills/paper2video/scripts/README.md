@@ -19,14 +19,15 @@ and are never printed.
 | `review.py` | Review stills: every anchor (once its beat has settled) plus scene starts/ends, rendered with one bundle (`stills.mjs`) and tiled into contact sheets per scene or for the film | no | `python3 scripts/review.py VIDEO-ZH zh --scenes s_method` |
 | `vreview.py` | Contact sheets of the vertical scenes (`V-<Name>` previews) at every anchor, one sheet per scene | no | `python3 scripts/vreview.py --scenes s_intro,s_end` |
 | `zh_breaks.py` | Chinese word boundaries (jieba) for the vertical captions → `public/data/zh_breaks.json`; re-run after each Chinese voice build | no | `uv run --with jieba python scripts/zh_breaks.py` |
-| `stills.mjs` | Many stills of one composition from a single bundle (used by `review.py`) | no | `node scripts/stills.mjs VIDEO-EN out/stills 120,480,900 --scale 0.5` |
-| `contact_sheet.py` | Tile rendered stills into one review image | no | `python3 scripts/contact_sheet.py out/sheet.png out/stills/*.png` |
+| `stills.mjs` | Many stills of one composition from a single bundle (used by `review.py`) | no | `node scripts/stills.mjs VIDEO-EN review/stills 120,480,900 --scale 0.5` |
+| `contact_sheet.py` | Tile rendered stills into one review image | no | `python3 scripts/contact_sheet.py review/sheet.png review/stills/*.png` |
 | `figdata.py` | Numbers from figure files: `dump` (vector PDF paths + labels), `images` (embedded raster panels), `heatmap` (colormap inversion of cells + their text), `markers` (digitise line+marker plots, overlay for checking) | no | `uv run --with pymupdf python scripts/figdata.py dump figs/fig3.pdf` |
-| `finalize.sh` | Render a composition, two-pass loudnorm to -14 LUFS / -1.5 dBTP, AAC 320k 48 kHz, optional cover still | no | `scripts/finalize.sh VIDEO-EN video_en Cover-EN` |
-| `finalize_vertical.sh` | Same for a 1080x1920 cut, plus vertical cover stills | no | `scripts/finalize_vertical.sh VIDEO-Vertical video_zh_v Cover-ZH-3x4 Cover-ZH-9x16` |
-| `verify.py` | Check a finished file: streams, duration vs timeline, loudness, full-mix ASR vs script + key terms (local whisper by default), full-frame motion runs (zoom/drift/jitter) -> `notes/verify.<name>.json` | no (optional) | `python3 scripts/verify.py out/video_en.mp4 --cut en` |
+| `covers.sh` | The standard cover set → `out/covers/` (`bilibili.jpg` at 3840×2160 + its 4:3 / 16:9 crop previews, `youtube.jpg` < 2 MB, `zh_3x4.jpg`, `zh_9x16.jpg`, optional `en_*`), all JPEG; missing stills are skipped | no | `scripts/covers.sh youtube=Cover2-EN` |
+| `finalize.sh` | Render a composition, two-pass loudnorm to -14 LUFS / -1.5 dBTP, AAC 320k 48 kHz, optional cover still | no | `scripts/finalize.sh VIDEO-EN <slug>_en` |
+| `finalize_vertical.sh` | Same for a 1080x1920 cut, plus vertical cover stills | no | `scripts/finalize_vertical.sh VIDEO-V-ZH <slug>_zh_vertical` |
+| `verify.py` | Check a finished file: streams, duration vs timeline, loudness, full-mix ASR vs script + key terms (local whisper by default), full-frame motion runs (zoom/drift/jitter) -> `notes/verify.<name>.json` | no (optional) | `python3 scripts/verify.py out/<slug>_en.mp4 --cut en` |
 | `export_handoff.py` | For editing apps: silent picture (+ per-scene clips), voice/music/sfx stems, SRT, scene CSV, CMX3600 EDL | no | `python3 scripts/export_handoff.py VIDEO-EN --lang en --per-scene` |
-| `new_video.sh` | Workspace mode: create a video folder from the template + scripts, linked to the workspace's shared `node_modules` and `.env` (copy this script to the workspace root, next to the shared `package.json`) | no | `./new_video.sh "Paper X video"` |
+| `new_video.sh` | Workspace mode: create `<NNN>_<ShortName>/` (NNN counts down from 999, so the newest video sorts first) from the template + scripts, linked to the workspace's shared `node_modules` and `.env` (copy this script to the workspace root, next to the shared `package.json`) | no | `./new_video.sh LoRA` |
 | `common.py` | Shared helpers (root, keys, loudness, timeline maths, uv runner) | - | imported |
 
 ## scenes.json fields used here

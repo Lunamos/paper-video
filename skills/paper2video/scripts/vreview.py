@@ -3,7 +3,7 @@
 scene's start and end, rendered from the `V-<Name>` scene compositions (src/vertical/scenes/registry.ts) with one
 bundle per scene, tiled into one contact sheet per scene (270×480 cells).
 
-Usage: python3 scripts/vreview.py [--cut zh] [--scenes s_intro,s_end] [--after 18] [--scale 0.5] [--out out/vreview]
+Usage: python3 scripts/vreview.py [--cut zh] [--scenes s_intro,s_end] [--after 18] [--scale 0.5] [--out review/vertical]
 Look for: text outside the text-safe area or under the captions, more than ~3 elements, empty top/bottom bands
 (the picture should fill the frame), beats that miss their anchor.
 """
@@ -23,7 +23,7 @@ ap.add_argument("--cut", default="zh")
 ap.add_argument("--scenes", help="comma-separated scene ids (default: all registered vertical scenes)")
 ap.add_argument("--after", type=int, default=18)
 ap.add_argument("--scale", type=float, default=0.5)
-ap.add_argument("--out", default="out/vreview")
+ap.add_argument("--out", default="review/vertical")
 a = ap.parse_args()
 
 reg = (ROOT / "src/vertical/scenes/registry.ts").read_text()

@@ -13,9 +13,23 @@ Built in: **YouTube** and **Bilibili**. For any other platform the user names (X
 
 Vertical cut: build it **natively for the phone** (`reference/vertical.md`): same audio, new 9:16 layouts with very big type and one focus per beat, inside the platforms' safe area. The template's `Vertical` composition (the 16:9 film re-rendered in a band between a title block and captions) is only a quick draft — its text is too small on a phone.
 
+## Files (`out/`, fixed names; `<slug>` = the project's short name in lower case)
+
+| File | For |
+|---|---|
+| `<slug>_zh.mp4` + `.srt`, `<slug>_en.mp4` + `.srt` | horizontal cuts per language (Bilibili, YouTube) |
+| `<slug>_zh_vertical.mp4` | vertical cut |
+| `covers/bilibili.jpg` (+ `bilibili_preview_4x3.jpg`, `bilibili_preview_16x9.jpg` to check the two crops) | Bilibili's single cover |
+| `covers/youtube.jpg` | YouTube thumbnail (< 2 MB) |
+| `covers/zh_3x4.jpg`, `covers/zh_9x16.jpg` (+ `en_*` if wanted) | vertical covers |
+| `social_copy.md` | file table on top, then one section per platform |
+
+`out/` holds only the current version of each file. Review stills, contact sheets and auditions go to `review/`.
+
 ## Covers
+- `scripts/covers.sh` renders the whole set from the stills `Cover-Bili`, `Cover-EN`, `Cover-ZH-3x4`, `Cover-ZH-9x16` (`Cover-EN-3x4`, `Cover-EN-9x16`); pass `name=StillId` for other ids.
 - YouTube: 16:9 1920×1080 (under 2 MB).
-- **Bilibili takes ONE cover image** but shows it twice: cropped to **4:3 in the home feed** and as **16:9 on the video page and the user's space**. Make one 16:9 master (`Cover-Bili`, rendered with `--scale=2` → 3840×2160, exported as JPEG ~1 MB) with every readable element and the key visual inside the centred 4:3 area (x 240–1680 of 1920) and only background extension in the side bands; check both crops (`ffmpeg -i cover_bilibili.png -vf crop=iw*0.75:ih cover_bilibili_preview_4x3.jpg`) and tell the user to keep the uploader's 4:3 crop centred. Nothing important in the bottom-right corner (duration badge). Don't hand over separate 16:9 / 16:10 / 4:3 files for Bilibili — only one can be uploaded.
+- **Bilibili takes ONE cover image** but shows it twice: cropped to **4:3 in the home feed** and as **16:9 on the video page and the user's space**. Make one 16:9 master (`Cover-Bili`, rendered with `--scale=2` → 3840×2160, exported as JPEG ~1 MB) with every readable element and the key visual inside the centred 4:3 area (x 240–1680 of 1920) and only background extension in the side bands; check both crops (`covers.sh` writes them as `bilibili_preview_4x3.jpg` / `_16x9.jpg`) and tell the user to keep the uploader's 4:3 crop centred. Nothing important in the bottom-right corner (duration badge). Don't hand over separate 16:9 / 16:10 / 4:3 files for Bilibili — only one can be uploaded.
 - Vertical covers: 3:4 1080×1440 and 9:16 1080×1920.
 - One strong visual from the film (real data), a 2–6 word headline about the finding (not about the tool), one small pill with the key number or claim. High contrast, readable as a thumbnail.
 - The headline obeys the same truth rules as the script: if the result holds only for some settings (e.g. on par for the small model, better for the large ones), say "same or better", not "better", and let the pill name the setting of the number.

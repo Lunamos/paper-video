@@ -3,7 +3,7 @@
 scene's first and last moments, then tile them into contact sheets - one sheet per scene, or one for the film.
 
 Usage: python3 scripts/review.py <CompositionId> <cut> [--scenes s_intro,s_end] [--after 18] [--scale 0.5]
-                                 [--out out/review] [--per-sheet 12]
+                                 [--out review] [--per-sheet 12]
   e.g. python3 scripts/review.py VIDEO-ZH zh --scenes s_method
 Needs the composition's frames to be laid out by public/data/vo.<cut>.json (as the template does).
 Prints the sheet paths; open them and look for overlaps, clipping, empty frames, illegible or off-message text.
@@ -22,7 +22,7 @@ ap.add_argument("cut")
 ap.add_argument("--scenes", help="comma-separated scene ids (default: all)")
 ap.add_argument("--after", type=int, default=18, help="frames after each anchor (let the beat settle)")
 ap.add_argument("--scale", type=float, default=0.5)
-ap.add_argument("--out", default="out/review")
+ap.add_argument("--out", default="review")
 ap.add_argument("--per-sheet", type=int, default=12)
 a = ap.parse_args()
 
