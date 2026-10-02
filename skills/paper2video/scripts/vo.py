@@ -8,6 +8,10 @@ Backends (per cut, scenes.json `voices.<cut>.backend`):
               pitch-variation stats, and the best is picked automatically.
   edge        free, no key: Microsoft Edge neural voices via the `edge-tts` package (run through
               uv automatically). Word timings from WordBoundary events. Audio tags are stripped.
+  gpt-sovits  open-source voice cloning served by a GPT-SoVITS api_v2 server (local GPU or a remote one
+              through an ssh tunnel that vo.py can open itself: voices.<cut>.ssh / startCmd). Free per take,
+              so several seeds per scene; one local faster-whisper pass per take gives word timings and
+              the ASR check. Reference audio + its transcript set the timbre and the mood.
   recorded    your own narration: recordings/<cut>/<scene_id>.(wav|mp3|m4a|flac). Word timings from
               local faster-whisper, aligned to the script. Interior pauses kept unless --tighten.
   none        no audio: a silent timeline from reading speed, so captions and anchors still work.
@@ -301,6 +305,104 @@ def recorded_take(cut, scene_id, text, lang, cfg):
         meta.write_text(json.dumps(res, ensure_ascii=False))
     res = json.loads(meta.read_text())
     return key, audio, char_times(text, res["words"]), fresh, res
+
+
+# ================================================================ gpt-sovits (any GPT-SoVITS api_v2 server)
+GS_PARAMS = {"top_k": 5, "top_p": 0.8, "temperature": 0.7, "text_split_method": "cut1", "speed_factor": 1.0,
+             "repetition_penalty": 1.35, "batch_size": 1, "split_bucket": False, "parallel_infer": True,
+             "fragment_interval": 0.3}
+_tunnel = None
+
+
+def gs_up(url) -> bool:
+    try:
+        with urllib.request.urlopen(f"{url}/docs", timeout=4) as r:
+            return r.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
+
+
+def gs_ensure(cfg):
+    """Make the server reachable at cfg.url. If it is not and cfg.ssh is set: run cfg.startCmd on that host
+    (idempotent; it should start the server only if needed) and open our own tunnel, closed when vo.py exits.
+    Another process's tunnel on the same port is reused as is."""
+    global _tunnel
+    import atexit
+    import time
+    url = cfg.get("url", "http://127.0.0.1:9880").rstrip("/")
+    if gs_up(url):
+        return url
+    host = cfg.get("ssh")
+    if not host:
+        sys.exit(f"GPT-SoVITS server not reachable at {url} (start it, or set voices.<cut>.ssh / startCmd)")
+    if cfg.get("startCmd"):
+        print(f"   starting server: ssh {host} {cfg['startCmd']}")
+        r = subprocess.run(["ssh", host, cfg["startCmd"]], capture_output=True, text=True, timeout=600)
+        print("   " + (r.stdout.strip().splitlines() or ["(no output)"])[-1])
+        if r.returncode:
+            sys.exit(f"startCmd failed:\n{r.stdout[-800:]}{r.stderr[-800:]}")
+    port = int(url.rsplit(":", 1)[1].split("/")[0])
+    if _tunnel is not None and _tunnel.poll() is None:
+        _tunnel.terminate()
+    _tunnel = subprocess.Popen(["ssh", "-N", "-o", "ExitOnForwardFailure=yes", "-o", "ServerAliveInterval=30",
+                                "-L", f"{port}:127.0.0.1:{cfg.get('remotePort', port)}", host],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    atexit.register(lambda: _tunnel.poll() is None and _tunnel.terminate())
+    for _ in range(40):
+        if gs_up(url):
+            return url
+        time.sleep(0.5)
+    sys.exit(f"GPT-SoVITS server still not reachable at {url} after starting it and opening a tunnel to {host}")
+
+
+def gs_request(cfg, text, lang, seed) -> dict:
+    """The api_v2 /tts payload: defaults < cfg.params; reference audio and prompt are paths on the server."""
+    if not cfg.get("refAudio"):
+        sys.exit("voices.<cut>.refAudio (reference wav path on the server) is required for gpt-sovits")
+    lang2 = lang.split("-")[0]
+    return {**GS_PARAMS, **cfg.get("params", {}), "text": text, "text_lang": cfg.get("textLang", lang2),
+            "ref_audio_path": cfg["refAudio"], "prompt_text": cfg.get("promptText", ""),
+            "prompt_lang": cfg.get("promptLang", lang2), "aux_ref_audio_paths": cfg.get("auxRefAudio", []),
+            "seed": seed if seed is not None else -1, "media_type": "wav", "streaming_mode": False}
+
+
+def gs_synth(text, cfg, lang, seed):
+    """One GPT-SoVITS take (cached) + local faster-whisper words for timing and QA.
+    Returns (key, wav, per-char times, fresh, asr_result)."""
+    req = gs_request(cfg, text, lang, seed)
+    model = cfg.get("whisperModel", "medium")
+    key = cache_key(r={k: v for k, v in req.items() if k != "media_type"}, m=cfg.get("model", ""), b="gpt-sovits")
+    d = CACHE / "gpt-sovits"
+    wav, meta = d / f"{key}.wav", d / f"{key}.{model}.json"
+    fresh = not wav.exists()
+    if fresh:
+        url = gs_ensure(cfg)
+        body = json.dumps(req, ensure_ascii=False).encode()
+        for attempt in (1, 2):
+            try:
+                r = urllib.request.Request(f"{url}/tts", data=body, headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(r, timeout=max(120, len(text) * 2)) as f:
+                    data = f.read()
+                break
+            except urllib.error.HTTPError as e:
+                sys.exit(f"GPT-SoVITS HTTP {e.code}: {e.read()[:400].decode(errors='replace')}")
+            except (urllib.error.URLError, OSError):
+                if attempt == 2:
+                    raise
+                url = gs_ensure(cfg)  # e.g. a borrowed tunnel went away
+        if data[:4] != b"RIFF":
+            sys.exit(f"GPT-SoVITS returned no WAV: {data[:200]!r}")
+        d.mkdir(parents=True, exist_ok=True)
+        wav.write_bytes(data)
+    if not meta.exists():
+        import voice_qa
+        res = voice_qa.whisper(wav, lang, model)  # neutral prompt: transcript doubles as an independent check
+        meta.write_text(json.dumps(res, ensure_ascii=False))
+    res = json.loads(meta.read_text())
+    if dur_s(wav) > max(8.0, 0.45 * len(re.sub(r"\s", "", text))):
+        print(f"   WARNING {key}: {dur_s(wav):.0f}s audio for {len(text)} chars - the model probably ran on "
+              f"(repeated or invented speech); its ASR error will show it")
+    return key, wav, char_times(text, res["words"]), fresh, res
 
 
 # ================================================================ tokens
@@ -683,7 +785,7 @@ def build(args):
 
     # a manual pick is always part of its scene's pool, so a plain rebuild keeps it
     pool = {sc["id"]: (seeds + ([picks[sc["id"]]] if picks.get(sc["id"]) is not None and picks[sc["id"]] not in seeds else []))
-            if backend == "elevenlabs" else [None] for sc in scenes}
+            if backend in ("elevenlabs", "gpt-sovits") else [None] for sc in scenes}
     print(f"[batch] cut={cut} text={tl} backend={backend} scenes={len(scenes)} voice={voice or '-'}")
     remaining = None
     if backend == "elevenlabs":
@@ -734,6 +836,8 @@ def build(args):
                 key, audio, times, fresh = el_synth(text, voice, model, stability, seed, tl)
             elif backend == "edge":
                 key, audio, times, fresh = edge_synth(text, cfg, tl)
+            elif backend == "gpt-sovits":
+                key, audio, times, fresh, asr_result = gs_synth(text, cfg, tl, seed)
             else:
                 key, audio, times, fresh, asr_result = recorded_take(cut, sc["id"], text, tl, cfg)
             new_requests += fresh
@@ -765,7 +869,7 @@ def build(args):
         report.append({"scene": sc["id"], "picked": best["seed"],
                        "takes": [{k: v for k, v in t.items() if k in ("seed", "durationMs", "qa", "missing")} for t in takes]})
     order = [s["id"] for s in script["scenes"] if tl in s]
-    vo = {"version": 2, "meta": {"lang": cut, "textLang": tl, "backend": backend, "voice": voice, "model": model if backend == "elevenlabs" else None,
+    vo = {"version": 2, "meta": {"lang": cut, "textLang": tl, "backend": backend, "voice": voice, "model": model if backend == "elevenlabs" else cfg.get("model") if backend == "gpt-sovits" else None,
                                  "tempo": cfg.get("tempo", 1.0), "generated": dt.datetime.now().isoformat(timespec="seconds")},
           "scenes": [keep[i] for i in order if i in keep]}
     vo["meta"]["estimatedTotalMs"] = sum(max(s["minSeconds"] * 1000, s["leadInMs"] + s["durationMs"] + s["tailMs"]) for s in vo["scenes"])
@@ -839,12 +943,12 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build", help="build all (or some) scenes of one cut")
     b.add_argument("--lang", default="en", help="cut id = key in scenes.json voices (e.g. en, zh, zh_vertical)")
-    b.add_argument("--backend", choices=["elevenlabs", "edge", "recorded", "none"], help="override voices.<cut>.backend")
+    b.add_argument("--backend", choices=["elevenlabs", "edge", "gpt-sovits", "recorded", "none"], help="override voices.<cut>.backend")
     b.add_argument("--voice", help="override voices.<cut>.voice")
     b.add_argument("--model", help="override voices.<cut>.model (elevenlabs)")
     b.add_argument("--scene", help="comma-separated scene ids (others keep their previous build)")
-    b.add_argument("--seeds", help="comma-separated seeds, e.g. to widen one scene's pool (elevenlabs)")
-    b.add_argument("--takes", type=int, help="use only the first N configured seeds (elevenlabs)")
+    b.add_argument("--seeds", help="comma-separated seeds, e.g. to widen one scene's pool (elevenlabs, gpt-sovits)")
+    b.add_argument("--takes", type=int, help="use only the first N configured seeds (elevenlabs, gpt-sovits)")
     b.add_argument("--tighten", action=argparse.BooleanOptionalAction, default=None,
                    help="shorten long interior pauses (default: on, off for recorded)")
     b.add_argument("--asr", action="store_true", help="also ASR-check edge takes with local faster-whisper")
