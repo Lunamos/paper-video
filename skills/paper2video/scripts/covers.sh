@@ -17,7 +17,7 @@ cd "${PAPER_VIDEO_ROOT:-$(dirname "$0")/..}"
 PAIRS="bilibili=Cover-Bili youtube=Cover-EN zh_3x4=Cover-ZH-3x4 zh_9x16=Cover-ZH-9x16 en_3x4=Cover-EN-3x4 en_9x16=Cover-EN-9x16 $*"
 still_id() { local id="" kv; for kv in $PAIRS; do [[ ${kv%%=*} == "$1" ]] && id=${kv#*=}; done; echo "$id"; }
 mkdir -p out/covers
-TMP=$(mktemp -d)
+TMP=$(mktemp -d "${PAPER_VIDEO_TMPDIR:-${TMPDIR:-/tmp}}/covers.XXXXXX")  # the workspace drive when PAPER_VIDEO_TMPDIR is set
 trap 'rm -rf "$TMP"' EXIT
 IDS=$(npx remotion compositions --quiet 2>/dev/null | tr ' ' '\n')
 for name in bilibili youtube zh_3x4 zh_9x16 en_3x4 en_9x16; do

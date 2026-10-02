@@ -9,6 +9,7 @@ Needs the composition's frames to be laid out by public/data/vo.<cut>.json (as t
 Prints the sheet paths; open them and look for overlaps, clipping, empty frames, illegible or off-message text.
 """
 import argparse
+import os
 import pathlib
 import subprocess
 import sys
@@ -42,13 +43,14 @@ if not plan:
 
 out = ROOT / a.out / a.comp
 out.mkdir(parents=True, exist_ok=True)
-lst = out / "frames.txt"
+lst = out / f"frames_{os.getpid()}.txt"  # per process: several reviews may run at once
 lst.write_text("\n".join(f"{f} {lab}" for f, lab, _ in plan))
 r = subprocess.run(["node", str(pathlib.Path(__file__).resolve().parent / "stills.mjs"), a.comp, str(out), f"@{lst}",
                     "--scale", str(a.scale)], cwd=ROOT, capture_output=True, text=True)
 if r.returncode:
     sys.exit(r.stderr[-3000:])
 pngs = [p for p in r.stdout.split("\n") if p.endswith(".png")]
+lst.unlink(missing_ok=True)
 groups = {}
 for (f, lab, sid), png in zip(plan, pngs):
     groups.setdefault(sid if only else "film", []).append(png)

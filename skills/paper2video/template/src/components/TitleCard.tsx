@@ -8,7 +8,7 @@ import { color, ease, font } from "../theme";
 
 export type TitleCardProps = {
   kicker?: string; // e.g. "arXiv 2603.12228 · 2026" or "NeurIPS 2025"
-  title: string; // the paper's short title / name
+  title: React.ReactNode; // the paper's short title / name
   subtitle?: string; // the rest of the title, or the original title under a translation
   authors: string;
   affiliation?: string;
@@ -18,6 +18,7 @@ export type TitleCardProps = {
   beats?: { title?: number; authors?: number; claim?: number }; // frames (relative to the scene)
   hot?: string; // accent colour of the title
   serif?: boolean;
+  titleSize?: number;
 };
 
 export const TitleCard: React.FC<TitleCardProps> = ({
@@ -32,6 +33,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({
   beats = {},
   hot = color.text,
   serif = true,
+  titleSize,
 }) => {
   const f = useCurrentFrame();
   const { width: W, height: H } = useVideoConfig();
@@ -63,7 +65,7 @@ export const TitleCard: React.FC<TitleCardProps> = ({
             marginTop: vertical ? 30 : 26,
             fontFamily: serif ? font.serif : font.sans,
             fontWeight: serif ? 500 : 900,
-            fontSize: vertical ? 150 : 150,
+            fontSize: titleSize ?? 150,
             lineHeight: 1.04,
             letterSpacing: "-0.02em",
             color: hot,

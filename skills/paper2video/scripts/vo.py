@@ -896,7 +896,7 @@ def build(args):
         remaining2, _ = el_quota()
         log_paid(f"build cut={cut} model={model} voice={voice} new_requests={new_requests} "
                  f"remaining_before={remaining} remaining_after={remaining2}")
-        print(f"[quota] remaining {remaining2} (spent {remaining - remaining2})")
+        print(f"[quota] remaining {remaining2} (spent {remaining - remaining2} so far; the counter often lags — keep the books with the estimate above)")
     missing = [i for i in order if i not in keep]
     print(f"[done] {vo_path.relative_to(ROOT)} total≈{vo['meta']['estimatedTotalMs'] / 1000:.1f}s"
           + (f"  (not built yet: {', '.join(missing)})" if missing else ""))

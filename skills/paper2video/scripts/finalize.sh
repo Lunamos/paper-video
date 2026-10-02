@@ -19,7 +19,7 @@ RAW="out/${NAME}_raw.mp4"
 ARGS=(--crf="${CRF:-15}" --log=error)
 [[ -n "${CONCURRENCY:-}" ]] && ARGS+=(--concurrency="$CONCURRENCY")
 [[ -n "${PROPS:-}" ]] && ARGS+=(--props="$PROPS")
-npx remotion render "$COMP" "$RAW" "${ARGS[@]}"
+npx remotion render "$COMP" "$RAW" "${ARGS[@]}" || { echo "render failed — retrying once (don't run scripts that write public/ during a render)"; npx remotion render "$COMP" "$RAW" "${ARGS[@]}"; }
 # pass 1: measure
 MEAS=$(ffmpeg -hide_banner -nostats -i "$RAW" -af loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json -f null - 2>&1 | awk '/^\{/,/^\}/')
 get() { echo "$MEAS" | python3 -c "import sys,json; print(json.load(sys.stdin)['$1'])"; }

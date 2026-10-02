@@ -29,6 +29,8 @@ export const VHead: React.FC<{
       lineHeight: 1.12,
       letterSpacing: zh ? "0.01em" : "-0.03em",
       color: c,
+      // full-frame pictures run under the headline: a soft dark halo keeps it readable
+      textShadow: "0 0 28px rgba(11,14,19,0.85), 0 0 8px rgba(11,14,19,0.9)",
       ...appear(p, 24),
     }}
   >

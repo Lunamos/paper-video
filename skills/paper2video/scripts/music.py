@@ -25,7 +25,7 @@ Usage:
   python3 scripts/music.py --lang en [--dry-run]
   python3 scripts/music.py --lang en --refit [--max-stretch 0.12]
   python3 scripts/music.py --lang zh --refit --from en      (reuse the English bed for the Chinese cut, no credits)
-  python3 scripts/music.py --lang en --file ~/Music/some_cc0_track.mp3
+  python3 scripts/music.py --lang en --file ~/Music/some_cc0_track.mp3 [--keep-ending 25]
 """
 from __future__ import annotations
 
@@ -165,6 +165,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--lang", default="en", help="cut id (reads public/data/vo.<cut>.json)")
     ap.add_argument("--file", help="use this royalty-free track instead of generating one")
+    ap.add_argument("--keep-ending", type=float, default=0, help="with --file: keep the track's last N seconds as the film's ending")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--refit", action="store_true", help="re-time the cached composition to the current timeline")
     ap.add_argument("--max-stretch", type=float, default=0.12)
@@ -175,7 +176,22 @@ def main():
     dst.parent.mkdir(parents=True, exist_ok=True)
     total_s = sum(d for _, _, d in scene_spans(load_vo(a.lang), fps)) / fps + RING_OUT_S
     if a.file:
-        level(pathlib.Path(a.file).expanduser(), dst, total_s)
+        src = pathlib.Path(a.file).expanduser()
+        if a.keep_ending and dur_s(src) > total_s > a.keep_ending + 5:
+            # body of the track up to (total - ending) + the track's own last `keep_ending` seconds, joined by a crossfade,
+            # so the film ends on the music's real ending instead of a fade in the middle of a phrase
+            keep, xf = a.keep_ending, 2.0
+            tmp = dst.with_suffix(".ending.wav")
+            body_end = total_s - keep + xf
+            subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", str(src), "-filter_complex",
+                            f"[0:a]atrim=0:{body_end:.3f},asetpts=PTS-STARTPTS[a];"
+                            f"[0:a]atrim=start={dur_s(src) - keep:.3f},asetpts=PTS-STARTPTS[b];[a][b]acrossfade=d={xf}[out]",
+                            "-map", "[out]", "-ar", "44100", "-ac", "2", str(tmp)], check=True)
+            level(tmp, dst)
+            tmp.unlink()
+            print(f"[file] kept the last {keep:.0f} s of the track as the ending")
+        else:
+            level(src, dst, total_s)
         return
     if a.refit:
         refit(script, a.lang, fps, dst, a.max_stretch, a.src_cut)
