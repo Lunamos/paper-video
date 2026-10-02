@@ -2,9 +2,11 @@
 """Background music bed for one cut, composed chapter by chapter to the voice-over timeline.
 
 Optional. Two ways:
-  1. ElevenLabs Music (paid, ELEVENLABS_API_KEY in env or .env): one instrumental composition whose
+  1. A royalty-free track (--file; the default choice: CC0 / public domain / CC BY with the credit in the description):
+     levelled, trimmed to the video and faded out (--keep-ending N keeps the track's real ending; a track shorter than
+     the film is repeated with crossfades).
+  2. ElevenLabs Music (--generate, opt-in, costs credits — about 14 per second): one instrumental composition whose
      sections match your chapters in length, so the mood changes where the story does.
-  2. Your own royalty-free track (--file): levelled, trimmed to the video and faded out.
 Either way the result is public/audio/bgm_<cut>.mp3 at -17.4 LUFS (linear gain, no dynamics
 processing); the video ducks it under the voice.
 
@@ -22,7 +24,7 @@ notes/music_plan.<cut>.json) to the new section lengths: each section is cut out
 section changes by more than --max-stretch, it stops and you regenerate instead.
 
 Usage:
-  python3 scripts/music.py --lang en [--dry-run]
+  python3 scripts/music.py --lang en --generate [--dry-run]     (opt-in: costs credits)
   python3 scripts/music.py --lang en --refit [--max-stretch 0.12]
   python3 scripts/music.py --lang zh --refit --from en      (reuse the English bed for the Chinese cut, no credits)
   python3 scripts/music.py --lang en --file ~/Music/some_cc0_track.mp3 [--keep-ending 25]
@@ -166,6 +168,7 @@ def main():
     ap.add_argument("--lang", default="en", help="cut id (reads public/data/vo.<cut>.json)")
     ap.add_argument("--file", help="use this royalty-free track instead of generating one")
     ap.add_argument("--keep-ending", type=float, default=0, help="with --file: keep the track's last N seconds as the film's ending")
+    ap.add_argument("--generate", action="store_true", help="compose a new bed with ElevenLabs Music (costs credits; opt-in)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--refit", action="store_true", help="re-time the cached composition to the current timeline")
     ap.add_argument("--max-stretch", type=float, default=0.12)
@@ -190,12 +193,34 @@ def main():
             level(tmp, dst)
             tmp.unlink()
             print(f"[file] kept the last {keep:.0f} s of the track as the ending")
+        elif dur_s(src) < total_s:
+            # shorter than the film: repeat it with crossfades until it covers the film, then trim and fade out
+            n, xf = int(total_s // (dur_s(src) - 3)) + 1, 3.0
+            tmp = dst.with_suffix(".loop.wav")
+            prev, parts = "c0", []
+            for i in range(1, n):
+                out = "out" if i == n - 1 else f"x{i}"
+                parts.append(f"[{prev}][c{i}]acrossfade=d={xf}[{out}]")
+                prev = out
+            if n > 1:
+                subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error"] + sum([["-i", str(src)] for _ in range(n)], [])
+                               + ["-filter_complex", ";".join(f"[{i}:a]asetpts=PTS-STARTPTS[c{i}]" for i in range(n)) + ";" + ";".join(parts),
+                                  "-map", "[out]", "-ar", "44100", "-ac", "2", str(tmp)], check=True)
+                level(tmp, dst, total_s)
+                tmp.unlink()
+                print(f"[file] track shorter than the film: repeated {n}× with {xf:.0f} s crossfades")
+            else:
+                level(src, dst, total_s)
         else:
             level(src, dst, total_s)
         return
     if a.refit:
         refit(script, a.lang, fps, dst, a.max_stretch, a.src_cut)
         return
+    if not a.generate:
+        sys.exit("Music generation is opt-in (it costs credits): pick a royalty-free track and run\n"
+                 f"  python3 scripts/music.py --lang {a.lang} --file path/to/track.mp3 [--keep-ending 20]\n"
+                 "(CC0 / public domain / CC BY with the credit in the description), or add --generate to compose one with ElevenLabs Music.")
     if not env_key("ELEVENLABS_API_KEY", required=False):
         print("No ELEVENLABS_API_KEY: music generation skipped (the video works without music).\n"
               "To add a bed, pick a royalty-free / CC0 instrumental track (e.g. YouTube Audio Library,\n"
