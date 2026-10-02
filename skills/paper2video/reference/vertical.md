@@ -78,5 +78,5 @@ vertical copy) before uploading. What it found on three cuts:
 - an illustration's hero number whose "not the paper's model" label was only in the small source line — put a chip
   next to the number;
 - bars of different widths (area overstates a ratio); a source line running under the button column;
-- an end card saying 「见简介」 for things the description did not contain.
+- an end card saying 「见简介」 at all (don't point to the description; end on the paper's point).
 Small print over a bright picture needs a dark plate, not just a halo.
