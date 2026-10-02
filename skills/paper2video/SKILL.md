@@ -11,7 +11,7 @@ You are the **lead**: you plan, build the shared pieces, hand out well-scoped wo
 
 Supporting material (read when you reach that stage):
 - `reference/rigor.md` — claims ledger, data handling, independent fact-check
-- `reference/voice.md` — narration backends (ElevenLabs / free edge-tts / the user's own recording / none), QA, pronunciation
+- `reference/voice.md` — narration backends (ElevenLabs / free edge-tts / self-hosted GPT-SoVITS / the user's own recording / none), QA, pronunciation, open-source TTS know-how
 - `reference/visual-style.md` — design system, motion rules, data honesty, review loop
 - `reference/platforms.md` — YouTube + Bilibili deliverables: specs, covers, titles, descriptions, chapters
 - `reference/vertical.md` — the 9:16 phone cut: safe area, type sizes, one focus per beat, hook, building it from the same audio
@@ -85,7 +85,7 @@ Expect feedback on tone, pacing, clarity and specific frames (they quote timesta
 
 - Fun from the real material, never at the cost of rigor: the paper's own surprises, clever experiments and examples, shown the way the authors meant them.
 - Hook → title → body: within 10–20 s the viewer must know what they are watching (which paper, by whom, what it claims). Keep the hook short, then a full-screen title card that the narration reads out; do this in every cut, vertical included.
-- Focus over coverage: ≤ 4 minutes, one finding, its best evidence, the caveats that matter; a viewer who is bored at minute three never sees the rest.
+- Shorter is better: the goal is the paper's idea, its main experiments and its conclusion — usually 2–4 minutes (≤ 4 unless the user asks for more); cut anything that doesn't serve that. One finding, its best evidence, the caveats that matter; a viewer who is bored at minute three never sees the rest.
 - Truth over hype: no number without a source; don't state claims more strongly than the paper; show caveats the paper states.
 - Real data on real-data charts; illustrations labelled SCHEMATIC; no count-up number animations; bars from zero unless the axis says log.
 - No full-frame shake/punch-in/zoom effects — emphasise the specific card; full-frame scale changes also caused visible text jitter in renders.
