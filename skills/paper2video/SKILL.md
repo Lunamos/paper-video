@@ -64,7 +64,7 @@ Build the narration before animating (`reference/voice.md`): `scripts/vo.py buil
 
 ## 7. Independent fact-check
 
-Spawn a fresh agent that did not build anything to check the script and every on-screen string/number against the paper (prompt in `reference/rigor.md`). One light pass is enough by default: the script and copy right after the script is final (before the paid voice, when wording fixes are cheapest) — numbers, settings, overclaims. Check the screens yourself against `notes/claims.md` while reviewing the sheets; add a second independent pass (screens, plotted data, covers) only for a high-stakes film or when the user asks. Fix MUST-FIX items (including voice-over wording, then regenerate those scenes and `music.py --refit`) and most SHOULD-FIX items.
+Spawn a fresh agent that did not build anything to check the script and every on-screen string/number against the paper (prompt in `reference/rigor.md`). One light pass is enough by default: the script and copy right after the script is final (before the paid voice, when wording fixes are cheapest) — numbers, settings, overclaims. Check the screens yourself against `notes/claims.md` while reviewing the sheets; add a second independent pass (screens, plotted data, covers) only for a high-stakes film or when the user asks. Fix MUST-FIX items (including voice-over wording, then regenerate those scenes and re-time the music: `music.py --refit` for a generated bed, the same `--file … --keep-ending N` again for a library track) and most SHOULD-FIX items.
 
 ## 8. Sound, render, verify
 
