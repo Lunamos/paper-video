@@ -35,6 +35,7 @@ src/
   components/core.tsx         prog, appear, useFontsReady, Tex, WipeReveal, Backdrop, ChapterTag, Headline,
                               SourceNote, Pill, MonoLabel, Card, StreamText
   components/Chart.tsx        LineChart, HBar, VBar
+  components/TitleCard.tsx    full-screen title card after the hook (title, authors, affiliation, claim; 16:9 and 9:16)
   components/Hand.tsx         HandLoop, HandCheck, HandNote (hand-drawn annotations)
   components/Captions.tsx     global word-highlighted captions
   timeline/timeline.ts        vo JSON types, voFiles map, buildTimeline
