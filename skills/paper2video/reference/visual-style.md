@@ -17,6 +17,11 @@ Reference point: 3Blue1Brown — dark background, few colours with fixed meaning
 - Scene transitions: content fades over a persistent backdrop; no flashes.
 - Everything settles before a scene ends.
 
+## Density: real data fills the frame
+The films people liked most are dense data visualisation: every scene has one main visual made of real data that fills the frame (many real examples, per-token / per-layer / per-step traces, hundreds of points), animated on its anchors. Warning signs to fix before rendering: a chart in a corner of an empty dark frame, a scene that is mostly a headline, more than a second or two of near-empty frame, one example where the paper has many.
+- When the paper ships only tables (no code or data) but its models are open-weight, a small demo run is the default way to get per-example data: run the model on the paper's benchmark questions (`reference/third-party.md` §7), save per-step / per-option traces, check the aggregate numbers against the paper's tables, label it "run for this video, paper's settings".
+- Efficiency rules never cut this: save on rework and repeated reads, not on visual ambition.
+
 ## Ideas that worked well
 - The hero visual of the paper, **with real data**, in the first seconds, then explained properly later and called back at the end.
 - A primer scene that makes the task tangible for someone with zero context (e.g. the actual input, the pointer/arrow structure, what "correct" means).

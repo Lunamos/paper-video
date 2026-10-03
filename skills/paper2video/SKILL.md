@@ -83,6 +83,7 @@ Quality first; cut only waste. Most waste is rework and repetition:
 - **Review what changed.** Contact sheets only for the scenes you touched (`review.py --scenes`, `vreview.py --scenes`, scale 0.5); one full-film sheet before the final render. Render full cuts only after the sheets look right; verify with `--asr none` when the audio did not change.
 - **Long jobs in the background** (renders, voice builds, ASR): keep working meanwhile and wait for the completion notice; no sleep/poll loops.
 - **Keep tool output short.** Everything printed stays in the context and is re-read on every later call (by mid-film that is a few hundred thousand tokens per call): tail logs, grep for PASS/FAIL/WARN, print counts and diffs of a few lines, write long reports to files and read only the part you need.
+- **Never at the expense of the picture**: dense real-data visuals are the point of the film (`reference/visual-style.md` "Density"); spend there.
 - **Reuse**: components from earlier films (title card, figure panels, colour bars), voice settings that already worked, music from the library.
 
 ## Running on a headless machine
