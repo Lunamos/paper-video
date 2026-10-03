@@ -36,7 +36,7 @@ src/
                               SourceNote, Pill, MonoLabel, Card, StreamText
   components/Chart.tsx        LineChart, HBar, VBar
   components/TitleCard.tsx    full-screen title card after the hook (title, authors, affiliation, claim; 16:9 and 9:16;
-                              optional paper-page screenshot `shot`, see below)
+                              optional paper page `shot` in the background, see below)
   components/Hand.tsx         HandLoop, HandCheck, HandNote (hand-drawn annotations)
   components/Captions.tsx     global word-highlighted captions
   timeline/timeline.ts        vo JSON types, voFiles map, buildTimeline
@@ -146,28 +146,34 @@ The scene after the hook: `kicker` (arXiv id / venue), `title`, `subtitle`, `aut
 `beats` (frames relative to the scene; key them to anchors), size props (`titleSize`, `subtitleSize`, `authorsSize`,
 `claimSize`, `top`) and an optional blurred `bg`. The same component lays itself out for 16:9 and 9:16.
 
-**Paper-page screenshot.** `node scripts/page_shot.mjs <arXiv id | URL>` writes `public/shots/arxiv.png` (arXiv abstract
-page: id, title, authors, abstract; 2× pixels) or `public/shots/page.png` (first screen of any URL). Then:
+**Paper page in the background.** `node scripts/paper_shot.mjs <arXiv id | paper.pdf | URL>` writes
+`public/shots/paper.png`: page 1 of the PDF (an arXiv id downloads it to `data/`), or the first screen of a web article
+that has no PDF. Then:
 
 ```tsx
-<TitleCard {...T} shot="shots/arxiv.png" beats={{ title: tTitle, authors: tInst, claim: tClaim, shot: tTitle }} />
+<TitleCard {...T} shot="shots/paper.png" beats={{ title: tTitle, authors: tInst, claim: tClaim, shot: tTitle }} />
 ```
+
+The page is a background layer: above the dark gradient, below the text, dimmed, with soft edges; it eases in on
+`beats.shot` (fade + small slide) and then drifts slowly upwards. Only that layer moves; the frame never zooms.
 
 | prop | default | |
 |---|---|---|
-| `shot` | — | staticFile path of the screenshot; without it the card looks exactly as before |
-| `beats.shot` | `beats.title` | when the page eases in (fade, small rise and settle, top-down reveal) |
-| `beats.shotOut` | `beats.authors` (≥ 60 frames after `beats.shot`) | 9:16 only: when the page gives way to the authors, institutions and claim |
-| `shotWidth` | 660 (16:9), 960 (9:16) | card width in px |
-| `shotMaxHeight` | 640 (16:9); the free slot (9:16) | taller pages are cropped, the cut softened by a fade |
+| `shot` | — | staticFile path of the page; without it the card looks exactly as before |
+| `beats.shot` | `beats.title` | when the page eases in |
+| `beats.shotDim` | `beats.authors` (≥ 60 frames after `beats.shot`) | 9:16 only: when the page dims and softens under the authors and claim |
+| `shotOpacity` | 0.34 (16:9), 0.5 (9:16, while the title is read) | |
+| `shotDimOpacity` | 0.08 | 9:16 after `beats.shotDim` |
+| `shotWidth` / `shotTop` | 820 / 60 (16:9, from x 1000); 1000 / 760 (9:16, centred) | size and top edge of the page |
+| `shotDrift` | 4 | upward drift in px per second (0 = still) |
 
-- **16:9**: the text column narrows to x 150–1070 (smaller default type: title 96, authors 38, claim 38); the page
-  is a card right-aligned at x 1780, vertically centred in y 130–860, and stays after its entrance. Long titles or
-  author lists: lower `titleSize` / `authorsSize` until the claim clears the captions.
-- **9:16**: one focus at a time — kicker and title on top; the page fills the slot below them (down to y 1270, above
-  the captions) while the title is read; on `beats.shotOut` it leaves and the authors, institutions, claim and note
-  appear in that slot.
-- Only the card animates; the frame never zooms. Render stills of both cuts around the beats to check.
+- **16:9**: the text column narrows to x 150–1070 (smaller default type: title 96, authors 38, claim 38); the page sits
+  centre-right, faded towards the text and out above the captions (y ≈ 760–900). Long titles or author lists: lower
+  `titleSize` / `authorsSize` until the claim clears the captions.
+- **9:16**: the text keeps its usual layout; the page sits under the title block (y 760 down to the captions) and is
+  clearly visible while the title is read, then dims and blurs slightly so the authors, institutions and claim read
+  on top of it. With a long title or subtitle, move `shotTop` below the text.
+- Not used on the covers. Render stills of both cuts around the beats to check.
 
 ## Captions
 
