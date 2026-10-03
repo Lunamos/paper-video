@@ -35,7 +35,8 @@ src/
   components/core.tsx         prog, appear, useFontsReady, Tex, WipeReveal, Backdrop, ChapterTag, Headline,
                               SourceNote, Pill, MonoLabel, Card, StreamText
   components/Chart.tsx        LineChart, HBar, VBar
-  components/TitleCard.tsx    full-screen title card after the hook (title, authors, affiliation, claim; 16:9 and 9:16)
+  components/TitleCard.tsx    full-screen title card after the hook (title, authors, affiliation, claim; 16:9 and 9:16;
+                              optional paper-page screenshot `shot`, see below)
   components/Hand.tsx         HandLoop, HandCheck, HandNote (hand-drawn annotations)
   components/Captions.tsx     global word-highlighted captions
   timeline/timeline.ts        vo JSON types, voFiles map, buildTimeline
@@ -138,6 +139,35 @@ npx remotion render VIDEO-EN out/sfx.wav    --props='{"lang":"en","mute":["voice
 - **No full-frame camera moves.** `SceneFade` only fades content at scene boundaries. Full-frame push-ins / zooms made
   text and hairlines jitter visibly; to emphasise something, animate that object (`<Card emphasis={p}>`, a glow, a
   `HandLoop`).
+
+## Title card (`components/TitleCard.tsx`)
+
+The scene after the hook: `kicker` (arXiv id / venue), `title`, `subtitle`, `authors`, `affiliation`, `claim`, `note`,
+`beats` (frames relative to the scene; key them to anchors), size props (`titleSize`, `subtitleSize`, `authorsSize`,
+`claimSize`, `top`) and an optional blurred `bg`. The same component lays itself out for 16:9 and 9:16.
+
+**Paper-page screenshot.** `node scripts/page_shot.mjs <arXiv id | URL>` writes `public/shots/arxiv.png` (arXiv abstract
+page: id, title, authors, abstract; 2× pixels) or `public/shots/page.png` (first screen of any URL). Then:
+
+```tsx
+<TitleCard {...T} shot="shots/arxiv.png" beats={{ title: tTitle, authors: tInst, claim: tClaim, shot: tTitle }} />
+```
+
+| prop | default | |
+|---|---|---|
+| `shot` | — | staticFile path of the screenshot; without it the card looks exactly as before |
+| `beats.shot` | `beats.title` | when the page eases in (fade, small rise and settle, top-down reveal) |
+| `beats.shotOut` | `beats.authors` (≥ 60 frames after `beats.shot`) | 9:16 only: when the page gives way to the authors, institutions and claim |
+| `shotWidth` | 660 (16:9), 960 (9:16) | card width in px |
+| `shotMaxHeight` | 640 (16:9); the free slot (9:16) | taller pages are cropped, the cut softened by a fade |
+
+- **16:9**: the text column narrows to x 150–1070 (smaller default type: title 96, authors 38, claim 38); the page
+  is a card right-aligned at x 1780, vertically centred in y 130–860, and stays after its entrance. Long titles or
+  author lists: lower `titleSize` / `authorsSize` until the claim clears the captions.
+- **9:16**: one focus at a time — kicker and title on top; the page fills the slot below them (down to y 1270, above
+  the captions) while the title is read; on `beats.shotOut` it leaves and the authors, institutions, claim and note
+  appear in that slot.
+- Only the card animates; the frame never zooms. Render stills of both cuts around the beats to check.
 
 ## Captions
 
