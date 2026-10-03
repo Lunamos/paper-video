@@ -9,6 +9,7 @@
 | `elevenlabs` | `ELEVENLABS_API_KEY` in env or `.env` | best expressiveness; v3 audio tags (`[curious]`, `[sighs]`, `[chuckles]`) | character-level timestamps; paid — check quota before every batch |
 | `edge` | nothing (internet) | clear, a bit announcer-like; no tags | free neural voices via the `edge-tts` package; word timings from its word-boundary events |
 | `gpt-sovits` | a GPT-SoVITS `api_v2` server (a GPU machine; reachable directly or through an ssh tunnel vo.py opens) | as good as the reference clip and the fine-tune; weak on languages the voice was not trained on | open-source voice cloning; free per take, so several seeds per scene; word timings from local faster-whisper — see "Open-source TTS" below |
+| `fish` | a Fish Audio API key (`FISH_API_KEY`, or the variable named in `keyEnv`) with **API** credits | strong Chinese voices from a large voice library | Fish Audio's HTTP API (fishaudio.org); paid per character, so quota check + estimate before every batch; no seed, so each take is a fresh random read; word timings from local faster-whisper — see "Fish Audio" below |
 | `recorded` | the user's own narration per scene in `recordings/<lang>/<scene>.wav` | the most human | timings from local faster-whisper, aligned to the script |
 | `none` | nothing | — | silent timeline from reading speed; captions + music only |
 
@@ -40,6 +41,21 @@ Pronunciation tricks (only change `tts`, never the caption `text`):
 
 ## Cost, caching, keys
 Every paid batch: query remaining quota, estimate the batch, print both, abort if it would exceed. Audio is cached by a hash of text + voice + model + settings + seed, so re-runs only pay for what changed. Keys live only in env/`.env` (git-ignored); never print them.
+
+## Fish Audio (hosted API)
+`backend: "fish"` calls Fish Audio's HTTP API (`POST https://fishaudio.org/api/open/v3/speech/tts`, Bearer key). Note: this is fishaudio.org, not fish.audio.
+
+```json
+"zh": {"backend": "fish", "voice": "<voiceId>", "model": "fishaudio-s21pro", "language": "zh",
+       "seeds": [11, 23], "whisperModel": "medium", "cpsCjk": 5.5, "keyTerms": ["<core term>"]}
+```
+Optional: `url` (API base, default `https://fishaudio.org/api/open`), `keyEnv` (default `FISH_API_KEY`), `format` (`wav` default, or `mp3`), `instruction` (a natural-language style note), `params` (merged into the request body as is, e.g. `{"speed": 0.95, "stability": 1.1}`; the request contract is strict, so an unknown field is a 400, not silently dropped), `creditsPerChar` (for models billed at a multiple).
+
+- **Billing.** The API spends the account's *API credits*, a balance separate from the website's membership credits (a website subscription does not fund the API). `GET /api/open/v1/profile` → `api_quota_remaining` is what `vo.py` checks; the estimate counts a CJK character as 1 credit and every other character (punctuation, Latin, spaces) as 0.5, rounded up per request, which matched the `X-OpenAPI-Credits-Used` response header exactly. Each fresh take's actual credits are summed and logged to `notes/tts_log.md`. Validation and auth failures are not charged.
+- **Takes.** The API has no seed. Each entry in `seeds` is only a take label in the cache key, so 2 seeds = 2 independent paid reads, and a take can be reproduced only from the cache (keep `audio_cache/`). Takes do differ (of two reads of one sentence, one scored ASR error 0.17 and the other 0), so 2 takes per scene and the ASR pick are still worth it for the final; use `--takes 1` for drafts.
+- **Capabilities.** Read `GET /api/open/v3/speech/tts/capabilities` (public) for the controls each model supports. Controls a model does not support are ignored and named in the `X-OpenAPI-Ignored-Parameters` header; `vo.py` prints a NOTE when that happens. The Fish models list speed, volume, stability, similarity, language and textNormalization, but not `instruction` (in a test it was ignored), so use a calmer voice or `speed` for a calmer read instead.
+- **Retries.** 429 and 5xx are retried twice with back-off; 402 (out of credits) stops the build; other 4xx errors stop with the API's message.
+- The API also offers `POST /v3/speech/tts/aligned` (SSE with word timestamps). `vo.py` uses local whisper instead, because the same transcript also serves the ASR check that picks the take.
 
 ## Recorded narration (collaboration)
 Give the user the final script per scene (`scripts/srt.py` or a printed table), ask for one file per scene (any common format, quiet room, 30 cm from the mic), put them in `recordings/<lang>/`, and build with `backend: "recorded"`. Their performance sets the timing; the picture follows via anchors.

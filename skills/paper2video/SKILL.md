@@ -11,7 +11,7 @@ You are the **lead**: you plan, build the shared pieces, hand out well-scoped wo
 
 Supporting material (read when you reach that stage):
 - `reference/rigor.md` — claims ledger, data handling, independent fact-check
-- `reference/voice.md` — narration backends (ElevenLabs / free edge-tts / self-hosted GPT-SoVITS / the user's own recording / none), QA, pronunciation, open-source TTS know-how
+- `reference/voice.md` — narration backends (ElevenLabs / Fish Audio API / free edge-tts / self-hosted GPT-SoVITS / the user's own recording / none), QA, pronunciation, open-source TTS know-how
 - `reference/visual-style.md` — design system, motion rules, data honesty, review loop
 - `reference/platforms.md` — YouTube + Bilibili deliverables: specs, covers, titles, descriptions, chapters
 - `reference/vertical.md` — the 9:16 phone cut: safe area, type sizes, one focus per beat, hook, building it from the same audio

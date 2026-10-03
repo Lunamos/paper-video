@@ -12,6 +12,10 @@ Backends (per cut, scenes.json `voices.<cut>.backend`):
               through an ssh tunnel that vo.py can open itself: voices.<cut>.ssh / startCmd). Free per take,
               so several seeds per scene; one local faster-whisper pass per take gives word timings and
               the ASR check. Reference audio + its transcript set the timbre and the mood.
+  fish        Fish Audio's HTTP API (fishaudio.org, /api/open/v3/speech/tts): paid per character (CJK 1 credit,
+              other characters half), so the balance is checked first as for ElevenLabs. No seed parameter: each
+              take is a fresh random read, cached under its seed label. Timings + ASR check from local faster-whisper.
+              Key: FISH_API_KEY (or voices.<cut>.keyEnv).
   recorded    your own narration: recordings/<cut>/<scene_id>.(wav|mp3|m4a|flac). Word timings from
               local faster-whisper, aligned to the script. Interior pauses kept unless --tighten.
   none        no audio: a silent timeline from reading speed, so captions and anchors still work.
@@ -29,7 +33,7 @@ Pipeline per scene and take:
 Outputs public/audio/<cut>/<scene>.mp3, public/data/vo.<cut>.json (version 2, read by
 src/timeline/timeline.ts) and notes/vo_report.<cut>.json.
 
-ElevenLabs: before every paid batch the subscription quota is queried, the billable characters of
+ElevenLabs / Fish Audio: before every paid batch the subscription quota is queried, the billable characters of
 all uncached requests are estimated and printed, and the run aborts if they exceed the remainder.
 Keys are only read from the environment or .env and are never printed or written anywhere.
 
@@ -48,6 +52,7 @@ import difflib
 import hashlib
 import http.client
 import json
+import math
 import pathlib
 import re
 import shutil
@@ -415,6 +420,101 @@ def gs_synth(text, cfg, lang, seed):
         print(f"   WARNING {key}: {dur_s(wav):.0f}s audio for {len(text)} chars - the model probably ran on "
               f"(repeated or invented speech); its ASR error will show it")
     return key, wav, char_times(text, res["words"]), fresh, res
+
+
+# ================================================================ fish (Fish Audio HTTP API, fishaudio.org)
+FISH_API = "https://fishaudio.org/api/open"
+
+
+def fish_req(cfg, path, payload=None, timeout=60):
+    """One Fish Audio request. JSON in, (bytes, headers) out. HTTP errors -> RuntimeError with the status
+    (the key is only ever sent in the Authorization header)."""
+    key = env_key(cfg.get("keyEnv", "FISH_API_KEY"))
+    r = urllib.request.Request(cfg.get("url", FISH_API).rstrip("/") + path,
+                               data=json.dumps(payload, ensure_ascii=False).encode() if payload is not None else None,
+                               headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                               method="POST" if payload is not None else "GET")
+    try:
+        with urllib.request.urlopen(r, timeout=timeout) as f:
+            return f.read(), f.headers
+    except urllib.error.HTTPError as e:
+        err = RuntimeError(f"Fish Audio HTTP {e.code} on {path}: {e.read()[:400].decode(errors='replace')}")
+        err.status = e.code
+        raise err from None
+
+
+def fish_quota(cfg):
+    """API credits left (a separate balance from the website's membership credits)."""
+    data, _ = fish_req(cfg, "/v1/profile")
+    p = json.loads(data)
+    return p.get("api_quota_remaining", 0), p
+
+
+def fish_cost(text, cfg) -> float:
+    """Billable credits of one request: CJK characters 1, every other character (punctuation, latin, spaces) 0.5, rounded
+    up per request (the published API rule, matched to X-OpenAPI-Credits-Used; some models bill at a multiple:
+    voices.<cut>.creditsPerChar)."""
+    n_cjk = len(CJK.findall(text))
+    return math.ceil((n_cjk + 0.5 * (len(text) - n_cjk)) * cfg.get("creditsPerChar", 1.0))
+
+
+def fish_request(cfg, text, lang) -> dict:
+    if not cfg.get("voice"):
+        sys.exit("voices.<cut>.voice (a Fish Audio voiceId) is required for the fish backend")
+    req = {"text": text, "voiceId": cfg["voice"], "modelId": cfg.get("model", "fishaudio-s21pro"),
+           "format": cfg.get("format", "wav"), "language": cfg.get("language", lang.split("-")[0])}
+    if cfg.get("instruction"):
+        req["instruction"] = cfg["instruction"]
+    return {**req, **cfg.get("params", {})}
+
+
+def fish_key(cfg, text, lang, seed):
+    return cache_key(r=fish_request(cfg, text, lang), seed=seed, b="fish")
+
+
+def fish_synth(text, cfg, lang, seed):
+    """One Fish Audio take (cached) + local faster-whisper words for timing and QA. The API has no seed: `seed` only
+    labels the take (and keys the cache), so a take is reproducible from the cache, never from the API.
+    Returns (key, audio, per-char times, fresh, asr_result, credits_used)."""
+    req = fish_request(cfg, text, lang)
+    model = cfg.get("whisperModel", "medium")
+    key = fish_key(cfg, text, lang, seed)
+    d = CACHE / "fish"
+    audio, meta, asr_path = d / f"{key}.{req['format']}", d / f"{key}.json", d / f"{key}.{model}.json"
+    fresh, used = not audio.exists(), 0.0
+    if fresh:
+        for attempt in (1, 2, 3):
+            try:
+                data, h = fish_req(cfg, "/v3/speech/tts", req, timeout=max(120, len(text) * 2))
+                break
+            except RuntimeError as e:
+                status = getattr(e, "status", 0)
+                if status == 402:
+                    sys.exit(f"ABORT: Fish Audio says the API credits are used up ({e})")
+                if status not in (429, 500, 502, 503, 504) or attempt == 3:
+                    sys.exit(str(e))
+            except (urllib.error.URLError, OSError, http.client.HTTPException):
+                if attempt == 3:
+                    raise
+            time.sleep(5 * attempt)
+        if not h.get("Content-Type", "").startswith("audio/"):
+            sys.exit(f"Fish Audio returned no audio: {data[:200]!r}")
+        used = float(h.get("X-OpenAPI-Credits-Used") or 0)
+        ignored = h.get("X-OpenAPI-Ignored-Parameters")
+        if ignored:
+            print(f"   NOTE {key}: the API ignored {ignored} for model {req['modelId']}")
+        d.mkdir(parents=True, exist_ok=True)
+        audio.write_bytes(data)
+        meta.write_text(json.dumps({"request": {k: v for k, v in req.items() if k != "text"}, "seed": seed, "creditsUsed": used,
+                                    "ignored": ignored, "quotaRemaining": h.get("X-OpenAPI-Quota-Remaining")}, ensure_ascii=False))
+    if not asr_path.exists():
+        import voice_qa
+        res = voice_qa.whisper(audio, lang, model)  # neutral prompt: transcript doubles as an independent check
+        asr_path.write_text(json.dumps(res, ensure_ascii=False))
+    res = json.loads(asr_path.read_text())
+    if dur_s(audio) > max(8.0, 0.45 * len(re.sub(r"\s", "", text))):
+        print(f"   WARNING {key}: {dur_s(audio):.0f}s audio for {len(text)} chars - probably repeated or invented speech")
+    return key, audio, char_times(text, res["words"]), fresh, res, used
 
 
 # ================================================================ tokens
@@ -797,7 +897,7 @@ def build(args):
 
     # a manual pick is always part of its scene's pool, so a plain rebuild keeps it
     pool = {sc["id"]: (seeds + ([picks[sc["id"]]] if picks.get(sc["id"]) is not None and picks[sc["id"]] not in seeds else []))
-            if backend in ("elevenlabs", "gpt-sovits") else [None] for sc in scenes}
+            if backend in ("elevenlabs", "gpt-sovits", "fish") else [None] for sc in scenes}
     print(f"[batch] cut={cut} text={tl} backend={backend} scenes={len(scenes)} voice={voice or '-'}")
     # anchors are matched in the caption `text` (not in `tts`): check before any audio is made
     bad = []
@@ -811,7 +911,7 @@ def build(args):
     if bad:
         print("[anchors] not found in the caption text (anchors must be words of `text`, e.g. digits as written there, "
               "not the `tts` spelling):\n  " + "\n  ".join(bad))
-        if backend == "elevenlabs" and not args.dry_run:
+        if backend in ("elevenlabs", "fish") and not args.dry_run:
             sys.exit("fix the anchors first (nothing was generated)")
     remaining = None
     if backend == "elevenlabs":
@@ -831,6 +931,19 @@ def build(args):
               f"model={model} stability={stability}")
         if billable > remaining:
             sys.exit("ABORT: batch would exceed the remaining subscription quota")
+    elif backend == "fish":
+        todo, credits = 0, 0.0
+        for sc in scenes:
+            text = " ".join(l["say"] for l in prepare_lines(sc[tl], strip))
+            for seed in pool[sc["id"]]:
+                if not (CACHE / "fish" / f"{fish_key(cfg, text, tl, seed)}.{fish_request(cfg, text, tl)['format']}").exists():
+                    todo += 1
+                    credits += fish_cost(text, cfg)
+        remaining, prof = fish_quota(cfg)
+        print(f"[quota] Fish Audio API credits remaining={remaining} (membership credits, website only: {prof.get('credits', '-')})")
+        print(f"[estimate] takes/scene={len(seeds)} new_requests={todo} est_credits={credits:.0f} model={cfg.get('model', 'fishaudio-s21pro')}")
+        if credits > remaining:
+            sys.exit("ABORT: batch would exceed the remaining Fish Audio API credits")
     est = estimate_length(scenes, tl, cfg, defaults, strip)
     print(f"[length] ≈ {est // 60:.0f}:{est % 60:02.0f} from reading speed (target ≤ 4:00 unless the user asked for more; "
           f"trim the script before paying for voice if it is over)")
@@ -844,7 +957,7 @@ def build(args):
     vo_path.parent.mkdir(parents=True, exist_ok=True)
     old = json.loads(vo_path.read_text()) if vo_path.exists() else {}
     keep = {s["id"]: s for s in old.get("scenes", [])} if old.get("version") == 2 else {}
-    report, new_requests = [], 0
+    report, new_requests, spent = [], 0, 0.0
     for sc in scenes:
         block = sc[tl]
         lines = prepare_lines(block, strip)
@@ -864,6 +977,9 @@ def build(args):
                 key, audio, times, fresh = edge_synth(text, cfg, tl)
             elif backend == "gpt-sovits":
                 key, audio, times, fresh, asr_result = gs_synth(text, cfg, tl, seed)
+            elif backend == "fish":
+                key, audio, times, fresh, asr_result, used = fish_synth(text, cfg, tl, seed)
+                spent += used
             else:
                 key, audio, times, fresh, asr_result = recorded_take(cut, sc["id"], text, tl, cfg)
             new_requests += fresh
@@ -895,7 +1011,7 @@ def build(args):
         report.append({"scene": sc["id"], "picked": best["seed"],
                        "takes": [{k: v for k, v in t.items() if k in ("seed", "durationMs", "qa", "missing")} for t in takes]})
     order = [s["id"] for s in script["scenes"] if tl in s]
-    vo = {"version": 2, "meta": {"lang": cut, "textLang": tl, "backend": backend, "voice": voice, "model": model if backend == "elevenlabs" else cfg.get("model") if backend == "gpt-sovits" else None,
+    vo = {"version": 2, "meta": {"lang": cut, "textLang": tl, "backend": backend, "voice": voice, "model": model if backend == "elevenlabs" else cfg.get("model") if backend in ("gpt-sovits", "fish") else None,
                                  "tempo": cfg.get("tempo", 1.0), "generated": dt.datetime.now().isoformat(timespec="seconds")},
           "scenes": [keep[i] for i in order if i in keep]}
     vo["meta"]["estimatedTotalMs"] = sum(max(s["minSeconds"] * 1000, s["leadInMs"] + s["durationMs"] + s["tailMs"]) for s in vo["scenes"])
@@ -909,6 +1025,11 @@ def build(args):
         log_paid(f"build cut={cut} model={model} voice={voice} new_requests={new_requests} "
                  f"remaining_before={remaining} remaining_after={remaining2}")
         print(f"[quota] remaining {remaining2} (spent {remaining - remaining2} so far; the counter often lags — keep the books with the estimate above)")
+    elif backend == "fish" and new_requests:
+        remaining2, _ = fish_quota(cfg)
+        log_paid(f"build cut={cut} backend=fish model={cfg.get('model', 'fishaudio-s21pro')} voice={voice} new_requests={new_requests} "
+                 f"credits_used={spent:g} remaining_before={remaining} remaining_after={remaining2}")
+        print(f"[quota] Fish Audio API credits remaining {remaining2} (this run used {spent:g})")
     missing = [i for i in order if i not in keep]
     # scenes kept from an earlier build (--scene) carry that build's caption text: flag edits made since
     script_text = {(s["id"], l["id"]): l["text"] for s in script["scenes"] if tl in s for l in s[tl]["lines"]}
@@ -976,16 +1097,16 @@ def main():
     sub = p.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build", help="build all (or some) scenes of one cut")
     b.add_argument("--lang", default="en", help="cut id = key in scenes.json voices (e.g. en, zh, zh_vertical)")
-    b.add_argument("--backend", choices=["elevenlabs", "edge", "gpt-sovits", "recorded", "none"], help="override voices.<cut>.backend")
+    b.add_argument("--backend", choices=["elevenlabs", "edge", "gpt-sovits", "fish", "recorded", "none"], help="override voices.<cut>.backend")
     b.add_argument("--voice", help="override voices.<cut>.voice")
     b.add_argument("--model", help="override voices.<cut>.model (elevenlabs)")
     b.add_argument("--scene", help="comma-separated scene ids (others keep their previous build)")
-    b.add_argument("--seeds", help="comma-separated seeds, e.g. to widen one scene's pool (elevenlabs, gpt-sovits)")
-    b.add_argument("--takes", type=int, help="use only the first N configured seeds (elevenlabs, gpt-sovits)")
+    b.add_argument("--seeds", help="comma-separated seeds, e.g. to widen one scene's pool (elevenlabs, gpt-sovits, fish)")
+    b.add_argument("--takes", type=int, help="use only the first N configured seeds (elevenlabs, gpt-sovits, fish)")
     b.add_argument("--tighten", action=argparse.BooleanOptionalAction, default=None,
                    help="shorten long interior pauses (default: on, off for recorded)")
     b.add_argument("--asr", action="store_true", help="also ASR-check edge takes with local faster-whisper")
-    b.add_argument("--dry-run", action="store_true", help="print the plan (and ElevenLabs quota estimate) only")
+    b.add_argument("--dry-run", action="store_true", help="print the plan (and the ElevenLabs / Fish Audio quota estimate) only")
     a = sub.add_parser("audition", help="compare voices on one short text")
     a.add_argument("--lang", default="en")
     a.add_argument("--backend", choices=["elevenlabs", "edge"])

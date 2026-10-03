@@ -8,7 +8,7 @@ and are never printed.
 
 | Script | Purpose | Key? | Example |
 |---|---|---|---|
-| `vo.py` | Voice-over: one read per scene -> tighten pauses, min gaps, polish, normalise -> `public/audio/<cut>/*.mp3` + `public/data/vo.<cut>.json` (+ `notes/vo_report.<cut>.json`). Backends: `elevenlabs`, `edge`, `gpt-sovits` (self-hosted, via HTTP / ssh tunnel), `recorded`, `none` | only for `elevenlabs` | `python3 scripts/vo.py build --lang en` |
+| `vo.py` | Voice-over: one read per scene -> tighten pauses, min gaps, polish, normalise -> `public/audio/<cut>/*.mp3` + `public/data/vo.<cut>.json` (+ `notes/vo_report.<cut>.json`). Backends: `elevenlabs`, `edge`, `gpt-sovits` (self-hosted, via HTTP / ssh tunnel), `fish` (Fish Audio HTTP API), `recorded`, `none` | for `elevenlabs` and `fish` | `python3 scripts/vo.py build --lang en` |
 | `vo.py audition` | Same short text in several voices, with QA numbers | only for `elevenlabs` | `python3 scripts/vo.py audition --lang en --backend edge --voices a=en-US-AndrewNeural,b=en-US-AvaNeural` |
 | `voice_qa.py` | Prosody stats (YIN pitch variation, pauses) + ASR round-trip (Scribe with a key, else local faster-whisper) | no (optional) | `python3 scripts/voice_qa.py public/audio/en/s_intro.mp3 --text "..." --asr` |
 | `music.py` | Music bed composed per music section (ElevenLabs), or level your own royalty-free track -> `public/audio/bgm_<cut>.mp3` at -17.4 LUFS; `--refit` re-times the generated bed after a voice-over change (no credits); `--refit --from en` reuses the English bed for another language's cut | only to generate | `python3 scripts/music.py --lang en --refit` |
