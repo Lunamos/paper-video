@@ -443,8 +443,22 @@ def fish_req(cfg, path, payload=None, timeout=60):
         raise err from None
 
 
+def fish_cmd(cfg, args, payload=None):
+    """`voices.<cut>.synthCmd` (a list, run from the project folder): an external helper that does the synthesis instead of
+    the HTTP API - e.g. one that goes through a logged-in browser session for a plan the API does not bill. Called as
+    `<cmd> quota` -> {"remaining": n} and `<cmd> tts <out>` with the request JSON on stdin -> {"creditsUsed": n}."""
+    r = subprocess.run([*cfg["synthCmd"], *args], input=json.dumps(payload, ensure_ascii=False) if payload else None,
+                       capture_output=True, text=True, cwd=ROOT)
+    if r.returncode:
+        raise RuntimeError(f"synthCmd {' '.join(args[:1])} failed: {r.stderr.strip()[-400:]}")
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
 def fish_quota(cfg):
-    """API credits left (a separate balance from the website's membership credits)."""
+    """API credits left (a separate balance from the website's membership credits), or the helper's balance."""
+    if cfg.get("synthCmd"):
+        q = fish_cmd(cfg, ["quota"])
+        return q.get("remaining", 0), {"credits": q.get("remaining", "-")}
     data, _ = fish_req(cfg, "/v1/profile")
     p = json.loads(data)
     return p.get("api_quota_remaining", 0), p
@@ -484,6 +498,18 @@ def fish_synth(text, cfg, lang, seed):
     fresh, used = not audio.exists(), 0.0
     if fresh:
         for attempt in (1, 2, 3):
+            if cfg.get("synthCmd"):
+                d.mkdir(parents=True, exist_ok=True)
+                try:
+                    res_cmd = fish_cmd(cfg, ["tts", str(audio)], req)
+                    data, h = audio.read_bytes(), {"Content-Type": "audio/" + req["format"],
+                                                   "X-OpenAPI-Credits-Used": res_cmd.get("creditsUsed", 0)}
+                    break
+                except RuntimeError as e:
+                    if attempt == 3:
+                        sys.exit(str(e))
+                    time.sleep(10 * attempt)
+                    continue
             try:
                 data, h = fish_req(cfg, "/v3/speech/tts", req, timeout=max(120, len(text) * 2))
                 break
