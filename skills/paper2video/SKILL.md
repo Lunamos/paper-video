@@ -16,7 +16,7 @@ Supporting material (read when you reach that stage):
 - `reference/platforms.md` — YouTube + Bilibili deliverables: specs, covers, titles, descriptions, chapters
 - `reference/vertical.md` — the 9:16 phone cut: safe area, type sizes, one focus per beat, hook, building it from the same audio
 - `reference/handoff.md` — using the user's own materials, and exporting for editing software
-- `reference/third-party.md` — starting from only an arXiv link/title: finding source, code and data; extracting numbers from LaTeX/figures; small CPU illustrations; faithfulness when the paper is not the user's
+- `reference/third-party.md` — starting from only an arXiv link/title: finding source, code and data; extracting numbers from LaTeX/figures; demo runs for real per-example data; faithfulness when the paper is not the user's
 - `scripts/` — the pipeline (see `scripts/README.md`); `template/` — the Remotion starter (see `template/README.md`)
 
 ## 0. Intake (keep it short)
