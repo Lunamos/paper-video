@@ -4,6 +4,10 @@ A 16:9 film shrunk into a 9:16 frame is shown at 0.56×: a 48 px label becomes ~
 the screen is busy and half empty. Build the vertical cut **natively**: the same voice-over, music and SFX, new scene
 layouts for the phone. Viewers asked for: very big text, very few things on screen, one focus at a time.
 
+The numbers below are guidelines from what worked, not a cage. Keep the film's look stable (theme, fonts, colours,
+motion feel) and be inventive inside it: the vertical cut does not have to mirror the 16:9 scenes, and the best
+vertical moments are ones only a tall frame can do (see "Vertical-native visuals").
+
 ## Safe area for text, the whole frame for the picture (1080×1920)
 - **Text** (anything a viewer must read) stays in the text-safe area, measured from the official overlays (YouTube
   Shorts, Reels, TikTok) and what 抖音 / B 站竖屏 show: x 120–888, y ≈ 260–1500; below y 840 keep text at x ≤ 780
@@ -15,7 +19,7 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
 - Check a frame against the platforms' overlay images when in doubt.
 
 ## Layout and type
-- Stack: headline / keyword (y ≈ 280–620) → **one** main visual, **tall** and full-width (y ≈ 620–1280, bleeding
+- A stack that works: headline / keyword (y ≈ 280–620) → **one** main visual, **tall** and full-width (y ≈ 620–1280, bleeding
   beyond) → captions (y ≈ 1300–1500). Compose vertically: stacks, columns, towers, horizontal bars stacked down the
   screen, big objects that run off the frame edges — not a 16:9 chart shrunk into the middle.
 - Sizes at 1080 wide: headline 100–140 px bold; key phrase 72–96 px; hero number 180–260 px; labels ≥ 44 px (never
@@ -26,8 +30,9 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   A timed "word" that holds a list (「wait、however、suppose」) is split after 、/，/, into pieces with the same timing,
   so the caption can break inside the list instead of shrinking the whole page (numbers like 65,537 stay whole).
 - The only small text: the source line (≈ 26 px) and honesty chips (≈ 34 px) — rigor survives the format change.
-- At most three elements at once (focus, one label or headline, the caption), one thing moving at a time.
-- Charts: ≤ 4–5 bars or ≤ 3 lines, 2–4 ticks, direct labels instead of legends, no grid, ours highlighted, bars from
+- Usually at most three elements at once (focus, one label or headline, the caption), one thing moving at a time —
+  break this when a vertical-only effect needs it.
+- Charts, as a starting point: ≤ 4–5 bars or ≤ 3 lines, 2–4 ticks, direct labels instead of legends, no grid, ours highlighted, bars from
   zero. Formulas: one line of ≤ ~15 symbols at ≥ 100 px, built term by term — or leave them to the 16:9 film.
 - Long text (model outputs, examples): the one or two sentences that matter, very big, key words highlighted.
 - Filling the frame works best with the subject itself: a tower of layers running top to bottom, a bridge whose towers
@@ -36,6 +41,20 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   can fill bands too, but keep it quiet (≈ half the normal opacity) so it never becomes a second focus.
 - Pictures now run under text: give source lines and labels a soft dark halo or plate.
 - Loop: the end scene should import the intro's frame-0 constants (or a shared component) instead of copying values.
+
+## Vertical-native visuals (encouraged)
+Rebuild a scene for the phone whenever that is better than adapting the 16:9 one; the voice-over and anchors stay the
+same, the picture is free. Things only a tall frame does well:
+- a slow vertical pan along something long: a full real list of examples, a long model output, a tall figure, a
+  timeline or a stack of layers running the whole height;
+- top / bottom splits: before vs after, model A vs model B, loop 1 vs loop 4, each half full-width;
+- towers and columns that grow upward; huge single numbers; swipes from one real example to the next;
+- a grid of many real items (questions, tokens, images) filling the frame, with the one being discussed lifting out.
+Motion on a card or a figure (zoom into a region, pan) is fine and often needed; full-frame zoom/shake is still out.
+
+**The paper's own figures on a phone**: never a whole multi-panel figure at phone width — it becomes unreadable. Crop
+one panel from the vector PDF at ≥ 3× resolution, show it as large as the frame allows, and zoom / pan to the part
+being discussed while it is said; re-letter the key labels or numbers on top, large, if the originals are small.
 
 ## Pacing and structure
 - **Frame 0 is the hook**: the subject on screen with a claim of ≤ 7 words at ≥ 110 px — no logo, black frame or fade-in.
@@ -67,6 +86,10 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
   anchor with `python3 scripts/vreview.py [--scenes …]` (contact sheets per scene) → fix → render with
   `scripts/finalize.sh <PREFIX>-V-ZH <name>_zh_vertical` → check the first and last frames match (loop) and sample a
   frame every 5–6 s of the final file to see the pacing.
+- **Review it as a phone viewer**: contact sheets show small cells; also open full-size frames of every scene that
+  carries a figure, a table or small labels, and look at them scaled to phone size (≈ 400 px wide): can you read what
+  the voice is talking about? If not, crop, zoom or re-letter. Judge the vertical cut on its own, not as a copy of the
+  16:9 film — a tall-frame idea that the 16:9 cut lacks is a plus.
 
 ## Fact-check the vertical cut too
 New headlines, labels and layouts are new claims: run an independent screen fact-check on the vertical scenes (and the
