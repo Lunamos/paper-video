@@ -39,7 +39,7 @@ layouts for the phone. Viewers asked for: very big text, very few things on scre
 
 ## Pacing and structure
 - **Frame 0 is the hook**: the subject on screen with a claim of ≤ 7 words at ≥ 110 px — no logo, black frame or fade-in.
-- **Then the title card** (same scene as the 16:9 cut, `TitleCard` lays itself out for 9:16): paper title, authors, institution, claim — on screen by ~20 s; with `shot` the paper's first page shows under the title while it is read, then dims and softens behind the authors and claim (`beats.shotDim`).
+- **Then the title card** (same scene as the 16:9 cut, `TitleCard` lays itself out for 9:16): paper title, authors, institution, claim — on screen by ~20 s; with `shot` the paper's first page appears as a large white sheet right under the title while it is read, then slides down into the band under the captions (`beats.shotMove`, ≥ 3 s after it appears) and the authors, institution and claim appear where it was.
 - A visible change every 1–3 s, on the voice anchors; calm motion (fade/rise, draw-on, swap, highlight), no full-frame zoom.
 - Shorter than the 16:9 film when possible: leave out whole technical scenes (their audio simply isn't played) — check
   that the next scene's first line still follows. Chinese knowledge-vertical norm 1–3 min; Shorts ≤ 3 min.

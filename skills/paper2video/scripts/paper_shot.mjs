@@ -1,5 +1,5 @@
-// Picture of the paper for the title card's background: the first page of its PDF (title, authors, affiliations,
-// abstract) rendered as a sharp PNG — or, for a paper that only exists as a web article, the first screen of that page.
+// Picture of the paper for the title card's sheet of paper (TitleCard `shot`): the first page of its PDF (title, authors,
+// affiliations, abstract) rendered as a sharp PNG — or, for a paper that only exists as a web article, the first screen of that page.
 //
 // Usage: node scripts/paper_shot.mjs <arXiv id | arXiv URL | paper.pdf | PDF URL | web URL> [--out public/shots/paper.png]
 //   arXiv id / URL (2309.16588, 2309.16588v2, https://arxiv.org/abs/...): downloads https://arxiv.org/pdf/<id> to

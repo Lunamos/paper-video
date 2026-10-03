@@ -2,17 +2,23 @@
 // are watching — the paper's title, its authors and institutions, where it is published, and its one-sentence claim.
 // The narration names the paper on the same beat. Works at 16:9 and 9:16 (the layout follows the composition size).
 //
-// Optional `shot`: the first page of the paper's PDF (or the first screen of its web article) as a background element,
-// made with scripts/paper_shot.mjs. It sits above the dark gradient and below the text, dimmed and faded at its edges,
-// and eases in on the title beat (fade + a small slide), then drifts very slowly upwards.
-//   16:9  text column on the left, the page centre-right, faded out towards the text and above the caption band.
-//   9:16  the page under the title, clearly visible while the title is read; on the authors beat (or beats.shotDim)
-//         it dims (and softens) so the authors, institutions and claim read cleanly on top of it.
-// Only the page layer moves, never the whole frame (no zoom, no shake).
-import React from "react";
-import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+// Optional `shot`: the first page of the paper's PDF (or the first screen of its web article), made with
+// scripts/paper_shot.mjs, shown as a sheet of paper on the screen — solid white, never dimmed or blurred, thin edge,
+// rounded corners, soft shadow, a slight tilt. It says "this is the paper we are reading": it should be obvious at a
+// glance, not necessarily readable, and it never covers the text. Only its upper part shows (title, authors, abstract);
+// the lower edge fades out above the captions. It eases in on beats.shot (fade + a small slide), then drifts very
+// slowly upwards.
+//   16:9  text column on the left (x 150–1070, type capped at the column's sizes), the sheet centre-right
+//         (x ≈ 1160–1860, y ≈ 110–880).
+//   9:16  the sheet large right under the title block (placed from the measured text) while the title is read; on
+//         beats.shotMove (default: the authors beat, at least 3 s after the sheet appears) it slides down into the band
+//         under the captions, its header still showing, and the authors, institutions and claim appear where it was.
+// With a shot the text block is measured once its fonts are loaded and, if it would run into the captions, scaled down
+// to fit — so `shot` (plus beats) is all a card needs. Only the sheet moves, never the whole frame (no zoom, no shake).
+import React, { useLayoutEffect, useRef, useState } from "react";
+import { AbsoluteFill, continueRender, delayRender, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import { appear, prog } from "./core";
-import { clamp, color, ease, font } from "../theme";
+import { color, ease, font } from "../theme";
 
 export type TitleCardProps = {
   kicker?: string; // e.g. "arXiv 2603.12228 · 2026" or "NeurIPS 2025"
@@ -23,9 +29,10 @@ export type TitleCardProps = {
   claim?: React.ReactNode; // one sentence, appears on its beat
   note?: string; // e.g. "Unofficial explainer"
   bg?: string; // optional staticFile image, shown blurred behind the card
-  // frames (relative to the scene). shot: when the paper page eases in (default: with the title).
-  // shotDim (9:16 only): when the page dims under the authors and claim (default: the authors beat, ≥ 60 frames after shot).
-  beats?: { title?: number; authors?: number; claim?: number; shot?: number; shotDim?: number };
+  // frames (relative to the scene). shot: when the paper sheet eases in (default: with the title).
+  // shotMove (9:16 only): when the sheet slides down out of the way (default: the authors beat, ≥ 90 frames after
+  // shot); the authors and claim wait for it.
+  beats?: { title?: number; authors?: number; claim?: number; shot?: number; shotMove?: number };
   hot?: string; // accent colour of the title
   serif?: boolean;
   titleSize?: number;
@@ -35,13 +42,19 @@ export type TitleCardProps = {
   top?: number; // y of the block (default 22% of the height, 330 px vertical; 16:9 with a shot 18%)
   // titleSize / subtitleSize / authorsSize / claimSize: shrink for a long title or author list (check the 9:16 card clears the captions)
   shot?: string; // staticFile path of the paper page, e.g. "shots/paper.png" (scripts/paper_shot.mjs)
-  shotOpacity?: number; // the page's opacity (16:9 default 0.34; 9:16 0.5 while the title is read)
-  shotDimOpacity?: number; // 9:16: its opacity under the authors and claim (default 0.08)
-  shotWidth?: number; // px (16:9 default 820, from x 1000; 9:16 default 1000, centred)
-  shotTop?: number; // y of the page's top edge (16:9 default 60; 9:16 default 760, under the title block: move it below a
-  // long title or subtitle)
-  shotDrift?: number; // slow upward drift in px per second after the entrance (default 4; 0 = still)
+  shotWidth?: number; // px, width of the sheet (16:9 default 700; 9:16 900)
+  shotLeft?: number; // x of its left edge (16:9 default 1160; 9:16 centred)
+  shotTop?: number; // y of its top edge (16:9 default 110; 9:16: just under the measured title block)
+  shotTilt?: number; // degrees, clockwise (16:9 default 1.5; 9:16 -1.5; 0 = straight)
+  shotCrop?: { x?: number; top?: number }; // page margins cropped away, as fractions of the page (default x 0.08 per side, top 0.05)
+  shotDrift?: number; // slow upward drift in px per second after the entrance (default 3; 0 = still)
 };
+
+// 16:9 text column with a shot: x 150–1070 and type no larger than these
+const WIDE = { title: 96, subtitle: 40, authors: 38, claim: 38 };
+const FIT_BOTTOM = { wide: 890, vertical: 1270 }; // the text block is scaled down if it would end below this y
+const SHEET_BOTTOM = { wide: 880, vertical: 1290 }; // y where the sheet's lower edge has faded out (above the captions)
+const PARK_TOP = 1530; // 9:16: the sheet's top edge after beats.shotMove (the band under the captions)
 
 export const TitleCard: React.FC<TitleCardProps> = ({
   kicker,
@@ -61,63 +74,97 @@ export const TitleCard: React.FC<TitleCardProps> = ({
   claimSize,
   top,
   shot,
-  shotOpacity,
-  shotDimOpacity = 0.08,
   shotWidth,
+  shotLeft,
   shotTop,
-  shotDrift = 4,
+  shotTilt,
+  shotCrop = {},
+  shotDrift = 3,
 }) => {
   const f = useCurrentFrame();
   const { width: W, height: H, fps } = useVideoConfig();
   const vertical = H > W;
-  const wide = Boolean(shot) && !vertical; // 16:9 with the page: a narrower, smaller text column on the left
+  const wide = Boolean(shot) && !vertical; // 16:9 with the sheet: a narrower text column on the left, type capped
+  const cap = (v: number | undefined, wideMax: number, def: number) => (wide ? Math.min(v ?? wideMax, wideMax) : (v ?? def));
+
+  // with a shot: measure the text block (and its title part) once the fonts are in
+  const blockRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLDivElement>(null);
+  const [m, setM] = useState<{ block: number; head: number } | null>(null);
+  const [handle] = useState(() => (shot ? delayRender("TitleCard: measure the text") : null));
+  useLayoutEffect(() => {
+    if (handle === null) return;
+    document.fonts.ready.then(() => {
+      const b = blockRef.current;
+      const h = headRef.current;
+      if (b && h) setM({ block: b.offsetHeight, head: h.offsetTop + h.offsetHeight });
+      continueRender(handle);
+    });
+  }, [handle]);
+
   const t0 = beats.title ?? 0;
+  const tShot = beats.shot ?? t0;
+  const tMove = beats.shotMove ?? Math.max(beats.authors ?? t0 + 75, tShot + 90);
+  // 9:16 with a sheet: it moves out of the way first, then the authors and claim appear where it was
+  const after = (t: number, gap: number) => (shot && vertical ? Math.max(t, tMove + gap) : t);
   const pK = prog(f, Math.max(0, t0 - 12), 14, ease.out);
   const pT = prog(f, Math.max(0, t0 - 6), 20, ease.out);
   const pS = prog(f, t0 + 10, 18, ease.out);
-  const pA = prog(f, (beats.authors ?? t0 + 30) - 6, 18, ease.out);
-  const pC = prog(f, (beats.claim ?? t0 + 90) - 6, 18, ease.out);
+  const pA = prog(f, after(beats.authors ?? t0 + 30, 14) - 6, 18, ease.out);
+  const pC = prog(f, after(beats.claim ?? t0 + 90, 26) - 6, 18, ease.out);
   const left = vertical ? 120 : wide ? 150 : 160;
   const width = vertical ? 768 : wide ? 920 : W - 2 * left;
+  const blockTop = top ?? (vertical ? 330 : H * (wide ? 0.18 : 0.22));
+  const fit = shot && m ? Math.min(1, ((vertical ? FIT_BOTTOM.vertical : FIT_BOTTOM.wide) - blockTop) / m.block) : 1;
 
-  // ---- the paper page (background layer)
+  // ---- the paper sheet: solid white, slightly tilted, its upper part only, lower edge fading out
   let page: React.ReactNode = null;
   if (shot) {
-    const tShot = beats.shot ?? t0;
-    const pIn = prog(f, tShot - 6, 45, ease.out);
-    const tDim = beats.shotDim ?? Math.max(beats.authors ?? t0 + 75, tShot + 60);
-    const pDim = vertical ? prog(f, tDim - 10, 24, ease.inOut) : 0;
-    const full = shotOpacity ?? (vertical ? 0.5 : 0.34);
-    const op = pIn * interpolate(pDim, [0, 1], [full, Math.min(full, shotDimOpacity)], clamp);
+    const pIn = prog(f, tShot - 6, 40, ease.out);
+    const pMove = vertical ? prog(f, tMove - 6, 30, ease.inOut) : 0;
     const drift = (shotDrift * Math.max(0, f - tShot)) / fps;
-    const pw = shotWidth ?? (vertical ? 1000 : 820);
-    const px = vertical ? (W - pw) / 2 : 1000;
-    const py = shotTop ?? (vertical ? 760 : 60);
-    // soft edges fixed in the frame (the page drifts under them): in over 90 px (9:16: 140 px) from its top position, out before the
-    // captions (16:9 y ≈ 760–900; 9:16 y ≈ 1140–1290)
-    const fadeFrom = (vertical ? 1140 : 760) - py + drift;
-    const fadeTo = (vertical ? 1290 : 900) - py + drift;
-    const vMask = `linear-gradient(180deg, transparent ${drift}px, black ${drift + (vertical ? 140 : 90)}px, black ${fadeFrom}px, transparent ${fadeTo}px)`;
-    // sides: 16:9 fades towards the text column on the left and out at the right edge; 9:16 softens both edges
-    const hMask = vertical
-      ? "linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%)"
-      : "linear-gradient(90deg, transparent 0%, black 34%, black 86%, transparent 100%)";
+    const pw = shotWidth ?? (vertical ? 900 : 700);
+    const px = shotLeft ?? (vertical ? (W - pw) / 2 : 1160);
+    // 9:16: under the title block as measured (kicker, title, subtitle), but leave the sheet at least ~300 px
+    const headBottom = blockTop + (m ? m.head * fit : 420);
+    const py = shotTop ?? (vertical ? Math.min(Math.max(headBottom + 60, 560), SHEET_BOTTOM.vertical - 300) : 110);
+    const fade = vertical ? 130 : 170;
+    const wh = Math.max(fade + 60, (vertical ? SHEET_BOTTOM.vertical : SHEET_BOTTOM.wide) - py); // window height, fade included
+    const cx = shotCrop.x ?? 0.08;
+    const ct = shotCrop.top ?? 0.05;
+    const tilt = shotTilt ?? (vertical ? -1.5 : 1.5);
+    const pad = 70; // room for the shadow inside the masked box
+    const y = interpolate(pMove, [0, 1], [py, PARK_TOP]) - drift + (1 - pIn) * (vertical ? 40 : 20);
+    const x = px + (vertical ? 0 : (1 - pIn) * 50);
+    const mask = `linear-gradient(180deg, black 0px, black ${pad + wh - fade}px, transparent ${pad + wh}px)`;
     page = (
       <div
         style={{
           position: "absolute",
-          left: px,
-          top: py,
-          width: pw,
-          opacity: op,
-          filter: pDim > 0 ? `blur(${pDim * 5}px)` : undefined, // 9:16: under the text the page turns into texture
-          translate: `${vertical ? 0 : (1 - pIn) * 40}px ${(1 - pIn) * 28 - drift}px`,
-          maskImage: hMask,
-          WebkitMaskImage: hMask,
+          left: x - pad,
+          top: y - pad,
+          padding: pad,
+          opacity: pIn,
+          rotate: `${tilt * (1 - 0.3 * pMove)}deg`,
+          maskImage: mask,
+          WebkitMaskImage: mask,
         }}
       >
-        <div style={{ maskImage: vMask, WebkitMaskImage: vMask }}>
-          <Img src={staticFile(shot)} style={{ display: "block", width: "100%", height: "auto" }} />
+        <div
+          style={{
+            width: pw,
+            height: wh,
+            overflow: "hidden",
+            borderRadius: 10,
+            background: "#fff",
+            outline: "1.5px solid rgba(255,255,255,0.35)",
+            boxShadow: "0 28px 70px rgba(0,0,0,0.6), 0 4px 14px rgba(0,0,0,0.35)",
+          }}
+        >
+          <Img
+            src={staticFile(shot)}
+            style={{ display: "block", width: pw / (1 - 2 * cx), maxWidth: "none", height: "auto", marginLeft: (-pw * cx) / (1 - 2 * cx), translate: `0px ${-ct * 100}%` }}
+          />
         </div>
       </div>
     );
@@ -132,38 +179,40 @@ export const TitleCard: React.FC<TitleCardProps> = ({
       ) : null}
       <AbsoluteFill style={{ background: "radial-gradient(ellipse 80% 70% at 40% 45%, rgba(11,14,19,0.35), rgba(11,14,19,0.9))" }} />
       {page}
-      <div style={{ position: "absolute", left, width, top: top ?? (vertical ? 330 : H * (wide ? 0.18 : 0.22)) }}>
-        {kicker ? (
-          <div style={{ fontFamily: font.mono, fontSize: vertical ? 30 : wide ? 22 : 24, letterSpacing: "0.16em", textTransform: "uppercase", color: color.text2, ...appear(pK) }}>
-            {kicker}
+      <div ref={blockRef} style={{ position: "absolute", left, width, top: blockTop, scale: fit < 1 ? `${fit}` : undefined, transformOrigin: "0 0" }}>
+        <div ref={headRef}>
+          {kicker ? (
+            <div style={{ fontFamily: font.mono, fontSize: vertical ? 30 : wide ? 22 : 24, letterSpacing: "0.16em", textTransform: "uppercase", color: color.text2, ...appear(pK) }}>
+              {kicker}
+            </div>
+          ) : null}
+          <div
+            style={{
+              marginTop: vertical ? 30 : 26,
+              fontFamily: serif ? font.serif : font.sans,
+              fontWeight: serif ? 500 : 900,
+              fontSize: cap(titleSize, WIDE.title, 150),
+              lineHeight: 1.04,
+              letterSpacing: "-0.02em",
+              color: hot,
+              textShadow: hot !== color.text ? `0 0 60px ${hot}55` : undefined,
+              ...appear(pT, 24),
+            }}
+          >
+            {title}
           </div>
-        ) : null}
-        <div
-          style={{
-            marginTop: vertical ? 30 : 26,
-            fontFamily: serif ? font.serif : font.sans,
-            fontWeight: serif ? 500 : 900,
-            fontSize: titleSize ?? (wide ? 96 : 150),
-            lineHeight: 1.04,
-            letterSpacing: "-0.02em",
-            color: hot,
-            textShadow: hot !== color.text ? `0 0 60px ${hot}55` : undefined,
-            ...appear(pT, 24),
-          }}
-        >
-          {title}
+          {subtitle ? (
+            <div style={{ marginTop: wide ? 18 : 22, fontFamily: font.serif, fontSize: cap(subtitleSize, WIDE.subtitle, vertical ? 52 : 46), lineHeight: 1.25, color: color.text2, maxWidth: vertical ? width : 1300, ...appear(pS) }}>
+              {subtitle}
+            </div>
+          ) : null}
         </div>
-        {subtitle ? (
-          <div style={{ marginTop: wide ? 18 : 22, fontFamily: font.serif, fontSize: subtitleSize ?? (vertical ? 52 : wide ? 40 : 46), lineHeight: 1.25, color: color.text2, maxWidth: vertical ? width : 1300, ...appear(pS) }}>
-            {subtitle}
-          </div>
-        ) : null}
         <div style={{ marginTop: vertical ? 70 : wide ? 44 : 54, ...appear(pA) }}>
-          <div style={{ fontFamily: font.sans, fontWeight: 600, fontSize: authorsSize ?? (vertical ? 62 : wide ? 38 : 44), lineHeight: 1.35, color: color.text }}>{authors}</div>
+          <div style={{ fontFamily: font.sans, fontWeight: 600, fontSize: cap(authorsSize, WIDE.authors, vertical ? 62 : 44), lineHeight: 1.35, color: color.text }}>{authors}</div>
           {affiliation ? <div style={{ marginTop: 10, fontFamily: font.sans, fontSize: vertical ? 52 : wide ? 32 : 34, color: color.accent }}>{affiliation}</div> : null}
         </div>
         {claim ? (
-          <div style={{ marginTop: vertical ? 70 : wide ? 40 : 50, fontFamily: font.sans, fontSize: claimSize ?? (vertical ? 64 : wide ? 38 : 40), lineHeight: 1.35, color: color.text, ...appear(pC) }}>{claim}</div>
+          <div style={{ marginTop: vertical ? 70 : wide ? 40 : 50, fontFamily: font.sans, fontSize: cap(claimSize, WIDE.claim, vertical ? 64 : 40), lineHeight: 1.35, color: color.text, ...appear(pC) }}>{claim}</div>
         ) : null}
         {note ? (
           <div style={{ marginTop: vertical ? 50 : wide ? 30 : 36, fontFamily: font.mono, fontSize: vertical ? 30 : 19, letterSpacing: "0.12em", textTransform: "uppercase", color: color.text3, opacity: pA }}>

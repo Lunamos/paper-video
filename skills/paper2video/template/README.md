@@ -36,7 +36,7 @@ src/
                               SourceNote, Pill, MonoLabel, Card, StreamText
   components/Chart.tsx        LineChart, HBar, VBar
   components/TitleCard.tsx    full-screen title card after the hook (title, authors, affiliation, claim; 16:9 and 9:16;
-                              optional paper page `shot` in the background, see below)
+                              optional `shot`: the paper's first page as a sheet of paper, see below)
   components/Hand.tsx         HandLoop, HandCheck, HandNote (hand-drawn annotations)
   components/Captions.tsx     global word-highlighted captions
   timeline/timeline.ts        vo JSON types, voFiles map, buildTimeline
@@ -146,7 +146,7 @@ The scene after the hook: `kicker` (arXiv id / venue), `title`, `subtitle`, `aut
 `beats` (frames relative to the scene; key them to anchors), size props (`titleSize`, `subtitleSize`, `authorsSize`,
 `claimSize`, `top`) and an optional blurred `bg`. The same component lays itself out for 16:9 and 9:16.
 
-**Paper page in the background.** `node scripts/paper_shot.mjs <arXiv id | paper.pdf | URL>` writes
+**The paper's first page as a sheet of paper.** `node scripts/paper_shot.mjs <arXiv id | paper.pdf | URL>` writes
 `public/shots/paper.png`: page 1 of the PDF (an arXiv id downloads it to `data/`), or the first screen of a web article
 that has no PDF. Then:
 
@@ -154,25 +154,32 @@ that has no PDF. Then:
 <TitleCard {...T} shot="shots/paper.png" beats={{ title: tTitle, authors: tInst, claim: tClaim, shot: tTitle }} />
 ```
 
-The page is a background layer: above the dark gradient, below the text, dimmed, with soft edges; it eases in on
-`beats.shot` (fade + small slide) and then drifts slowly upwards. Only that layer moves; the frame never zooms.
+The page appears as a clear sheet of paper while the title is read — solid white, never dimmed or blurred, thin edge,
+rounded corners, soft shadow, a slight tilt — so the viewer sees at a glance "this is the paper they are reading". It
+backs the explainer up; it does not have to be readable, and it never covers the text. Only its upper part shows
+(title, authors, abstract) and its lower edge fades out above the captions. It eases in on `beats.shot` (fade + small
+slide), then drifts very slowly upwards; only the sheet moves, the frame never zooms. With a shot the text block is
+measured once its fonts are in and scaled down if it would run into the captions, so `shot` and the beats are normally
+all a card needs.
 
 | prop | default | |
 |---|---|---|
 | `shot` | — | staticFile path of the page; without it the card looks exactly as before |
-| `beats.shot` | `beats.title` | when the page eases in |
-| `beats.shotDim` | `beats.authors` (≥ 60 frames after `beats.shot`) | 9:16 only: when the page dims and softens under the authors and claim |
-| `shotOpacity` | 0.34 (16:9), 0.5 (9:16, while the title is read) | |
-| `shotDimOpacity` | 0.08 | 9:16 after `beats.shotDim` |
-| `shotWidth` / `shotTop` | 820 / 60 (16:9, from x 1000); 1000 / 760 (9:16, centred) | size and top edge of the page |
-| `shotDrift` | 4 | upward drift in px per second (0 = still) |
+| `beats.shot` | `beats.title` | when the sheet eases in |
+| `beats.shotMove` | `beats.authors` (≥ 90 frames after `beats.shot`) | 9:16 only: when the sheet slides down under the captions; the authors and claim wait for it |
+| `shotWidth` / `shotLeft` | 700 / 1160 (16:9); 900 / centred (9:16) | size and left edge of the sheet |
+| `shotTop` | 110 (16:9); 9:16: just under the measured title block | top edge |
+| `shotTilt` | 1.5° (16:9), −1.5° (9:16) | 0 = straight |
+| `shotCrop` | `{ x: 0.08, top: 0.05 }` | page margins cropped away (fractions of the page); `{ x: 0 }` for a page with narrow margins |
+| `shotDrift` | 3 | upward drift in px per second (0 = still) |
 
-- **16:9**: the text column narrows to x 150–1070 (smaller default type: title 96, authors 38, claim 38); the page sits
-  centre-right, faded towards the text and out above the captions (y ≈ 760–900). Long titles or author lists: lower
-  `titleSize` / `authorsSize` until the claim clears the captions.
-- **9:16**: the text keeps its usual layout; the page sits under the title block (y 760 down to the captions) and is
-  clearly visible while the title is read, then dims and blurs slightly so the authors, institutions and claim read
-  on top of it. With a long title or subtitle, move `shotTop` below the text.
+- **16:9**: text column x 150–1070, its type capped at title 96 / subtitle 40 / authors 38 / claim 38 (larger size props
+  are ignored, smaller ones kept); the sheet centre-right (x ≈ 1160–1860, y ≈ 110 down to ≈ 880, above the captions),
+  there for the whole scene.
+- **9:16**: while the title is read the sheet sits large right under the title block (placed from the measured text,
+  down to the captions); on `beats.shotMove` it slides down into the band under the captions (its header still
+  showing) and the authors, institutions and claim appear where it was — so they come in at the latest ~3.5 s after
+  `beats.shot`.
 - Not used on the covers. Render stills of both cuts around the beats to check.
 
 ## Captions
