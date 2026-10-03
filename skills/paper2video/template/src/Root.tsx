@@ -85,6 +85,7 @@ export const RemotionRoot: React.FC = () => {
         <Still id="Cover-Bili-Guides" component={CoverBili} width={1920} height={1080} defaultProps={{ lang: "zh" as const, guides: true }} />
         <Still id="Cover-ZH-3x4" component={CoverV} width={1080} height={1440} defaultProps={{ lang: "zh" as const }} />
         <Still id="Cover-ZH-9x16" component={CoverV} width={1080} height={1920} defaultProps={{ lang: "zh" as const }} />
+        <Still id="Cover-EN-9x16" component={CoverV} width={1080} height={1920} defaultProps={{ lang: "en" as const }} />
         <Still id="Cover-EN-3x4" component={CoverV} width={1080} height={1440} defaultProps={{ lang: "en" as const }} />
       </Folder>
     </>

@@ -43,7 +43,7 @@ src/
   timeline/SceneContext.tsx   useAnchor, useAnchors, useLine, useLang, useCut, useSceneDuration, useChapter
   timeline/sfx.ts             sound-effect cues, whooshes, music drop-outs (empty by default)
   scenes/registry.ts          scene id -> component
-  scenes/SExample.tsx         the reference scene
+  scenes/SExample.tsx         the reference scene (and vertical/scenes/VExample.tsx): unregister and delete both once your own scenes are registered
 public/data/vo.en.json, vo.zh.json   placeholder timings (one scene, no audio)
 scenes.example.json          script schema (copy to scenes.json)
 ```

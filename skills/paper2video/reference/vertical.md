@@ -80,3 +80,5 @@ vertical copy) before uploading. What it found on three cuts:
 - bars of different widths (area overstates a ratio); a source line running under the button column;
 - an end card saying 「见简介」 at all (don't point to the description; end on the paper's point).
 Small print over a bright picture needs a dark plate, not just a halo.
+- `VSource` is one line (`nowrap`) and cuts long text with an ellipsis — keep source lines to ~40 Latin / ~25 CJK characters at 26 px, or shorten them.
+- TitleCard at 9:16: a subtitle (original title under a translation) plus a long author/affiliation list can push the claim into the caption band; drop the subtitle in the vertical cut or shrink sizes until the claim ends above the captions.

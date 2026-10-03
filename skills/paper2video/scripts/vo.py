@@ -971,6 +971,7 @@ def audition(args):
 
 
 def main():
+    sys.stdout.reconfigure(line_buffering=True)  # progress visible in a redirected log (block-buffered otherwise)
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build", help="build all (or some) scenes of one cut")
